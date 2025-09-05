@@ -91,6 +91,7 @@ jobs:
 
       - name: Install Frida Fusion
         run: |
+          rm -rf requirements.txt
           pip install .
 
       - name: Run unit tests
