@@ -40,7 +40,7 @@ class TlsUnpinning(ModuleBase):
                 self.js_file = str(Path("frida_multiple_unpinning.js").resolve().absolute())
                 with open(self.js_file, "w", encoding='utf-8') as f:
                     f.write(data.get('source', ''))
-        
+
         return True
 
     def js_files(self) -> list:

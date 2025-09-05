@@ -38,4 +38,61 @@ Modules:
 pip3 install frida-fusion
 ```
 
+## Module engine
 
+You can check available modules with `frida-fusion --list-modules` command.
+
+```bash
+frida-fusion --list-modules
+
+ [ FRIDA ]—o—( FUSION )—o—[ MOBILE TESTS ] // v0.1.4
+     > hook your mobile tests with Frida
+
+
+Available modules
+  Module Name     : Description
+  Crypto          : Hook cryptography/hashing functions
+```
+
+### External modules
+
+You can develop or download community modules and load into frida-fusion.
+
+To pass to the Frida Fusion the external module path you can use the environment variable `FUSION_MODULES` with the full path of modules
+
+At linux:
+
+```bash
+export FUSION_MODULES=/tmp/modules
+
+# List all modules
+frida-fusion --list-modules
+
+# Using available module
+frida-fusion -f [app_id] -U --script-path . -m [module_name]
+```
+
+At windows:
+
+```bash
+$env:FUSION_MODULES = "C:\extra_mods"
+
+# List all modules
+frida-fusion --list-modules
+
+# Using available module
+frida-fusion -f [app_id] -U --script-path . -m [module_name]
+```
+
+### Community modules
+
+You can also use one of community developed modules
+
+```bash
+cd /tmp/
+git clone https://github.com/helviojunior/frida-fusion-community-modules
+export FUSION_MODULES=/tmp/frida-fusion-community-modules
+
+# List all modules
+frida-fusion --list-modules
+```
