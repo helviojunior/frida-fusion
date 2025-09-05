@@ -86,9 +86,10 @@ setTimeout(function() {
             const secretKeySpec = Java.use("javax.crypto.spec.SecretKeySpec");
             secretKeySpec.$init.overload("[B", "java.lang.String").implementation = function (key, cipher) {
                 const keyBase64 = fusion_bytesToBase64(key);
-                fusion_sendKeyValueData("secretKeySpec.init", [
+                fusion_sendKeyValueData("SecretKeySpec.init", [
                     {key: "Key", value: keyBase64},
-                    {key: "Algorithm", value: cipher}
+                    {key: "Algorithm", value: cipher},
+                    {key: "ClassType", value: fusion_getClassName(this)}
                 ]);
                 return secretKeySpec.$init.overload("[B", "java.lang.String").call(this, key, cipher);
             }
@@ -141,42 +142,20 @@ setTimeout(function() {
                 return output;
             };
 
-            /*
-            messageDigest.digest.overload("[B").implementation = function (input) {
-                const inputBase64 = fusion_bytesToBase64(input);
-                fusion_sendKeyValueData("messageDigest.digest", [
-                    {key: "Input", value: inputBase64},
-                    {key: "Algorithm", value: this.getAlgorithm()}
-                ]);
-                return this.digest.overload("[B").call(this, input);
-            };
-
-            messageDigest.digest.overload("[B", "int", "int").implementation = function (input, offset, len) {
-                const inputBase64 = fusion_bytesToBase64(input);
-                fusion_sendKeyValueData("messageDigest.digest", [
-                    {key: "Input", value: inputBase64},
-                    {key: "Algorithm", value: this.getAlgorithm()},
-                    {key: "Offset", value: offset},
-                    {key: "Length", value: len}
-                ]);
-                return this.digest.overload("[B", "int", "int").call(this, input, offset, len);
-            };*/
-             
-
         }
 
         if (MODULES.SecretKeyFactory) {
             fusion_sendMessage('*', "Module attached: javax.crypto.SecretKeyFactory");
             const secretKeyFactory = Java.use("javax.crypto.SecretKeyFactory");
             secretKeyFactory.getInstance.overload("java.lang.String").implementation = function (arg0) {
-                fusion_sendKeyValueData("secretKeyFactory.getInstance", [
+                fusion_sendKeyValueData("SecretKeyFactory.getInstance", [
                     {key: "Algorithm", value: arg0}
                 ]);
                 return this.getInstance(arg0);
             };
 
             secretKeyFactory.getInstance.overload("java.lang.String", "java.lang.String").implementation = function (arg0, arg1) {
-                fusion_sendKeyValueData("secretKeyFactory.getInstance", [
+                fusion_sendKeyValueData("SecretKeyFactory.getInstance", [
                     {key: "Algorithm", value: arg0},
                     {key: "Provider", value: arg1}
                 ]);
@@ -184,7 +163,7 @@ setTimeout(function() {
             };
 
             secretKeyFactory.getInstance.overload("java.lang.String", "java.security.Provider").implementation = function (arg0, arg1) {
-                fusion_sendKeyValueData("secretKeyFactory.getInstance", [
+                fusion_sendKeyValueData("SecretKeyFactory.getInstance", [
                     {key: "Algorithm", value: arg0},
                     {key: "Provider", value: arg1}
                 ]);
@@ -229,6 +208,7 @@ setTimeout(function() {
                 fusion_sendKeyValueData("cipher.init", [
                     {key: "HashCode", value: this.hashCode().toString()},
                     {key: "Key", value: fusion_keyToBase64(key)},
+                    {key: "KeyType", value: fusion_getClassName(key)},
                     {key: "Opmode", value: this.getOpmodeString(opmode)},
                     {key: "Algorithm", value: this.getAlgorithm()}
                 ]);
@@ -238,7 +218,9 @@ setTimeout(function() {
             cipher.init.overload("int", "java.security.cert.Certificate").implementation = function (opmode, certificate) {
                 fusion_sendKeyValueData("cipher.init", [
                     {key: "HashCode", value: this.hashCode().toString()},
+                    {key: "Key", value: fusion_keyToBase64(certificate)},
                     {key: "Certificate", value: fusion_keyToBase64(certificate)},
+                    {key: "KeyType", value: fusion_getClassName(certificate)},
                     {key: "Opmode", value: this.getOpmodeString(opmode)},
                     {key: "Algorithm", value: this.getAlgorithm()}
                 ]);
@@ -249,6 +231,7 @@ setTimeout(function() {
                 fusion_sendKeyValueData("cipher.init", [
                     {key: "HashCode", value: this.hashCode().toString()},
                     {key: "Key", value: fusion_keyToBase64(key)},
+                    {key: "KeyType", value: fusion_getClassName(key)},
                     {key: "Opmode", value: this.getOpmodeString(opmode)},
                     {key: "Algorithm", value: this.getAlgorithm()}
                 ]);
@@ -261,6 +244,7 @@ setTimeout(function() {
                     var data = [
                         {key: "HashCode", value: this.hashCode().toString()},
                         {key: "Key", value: fusion_keyToBase64(key)},
+                        {key: "KeyType", value: fusion_getClassName(key)},
                         {key: "Opmode", value: this.getOpmodeString(opmode)},
                         {key: "Algorithm", value: this.getAlgorithm()}
                     ];
@@ -487,7 +471,8 @@ setTimeout(function() {
             const ivParameter = Java.use("javax.crypto.spec.IvParameterSpec");
             ivParameter.$init.overload("[B").implementation = function (ivKey) {
                 fusion_sendKeyValueData("IvParameterSpec.init", [
-                    {key: "IV_Key", value: fusion_bytesToBase64(ivKey)}
+                    {key: "IV_Key", value: fusion_bytesToBase64(ivKey)},
+                    {key: "ClassType", value: fusion_getClassName(this)}
                 ]);
                 return this.$init.overload("[B").call(this, ivKey);
             }
@@ -496,7 +481,8 @@ setTimeout(function() {
                 fusion_sendKeyValueData("IvParameterSpec.init", [
                     {key: "IV Key", value: fusion_bytesToBase64(ivKey)},
                     {key: "Offset", value: offset},
-                    {key: "Length", value: len}
+                    {key: "Length", value: len},
+                    {key: "ClassType", value: fusion_getClassName(this)}
                 ]);
                 return this.$init.overload("[B", "int", "int").call(this, ivKey, offset, len);
             }
@@ -508,7 +494,8 @@ setTimeout(function() {
             gcmParameter.$init.overload("int", "[B").implementation = function (tLen, ivKey) {
                 fusion_sendKeyValueData("GCMParameterSpec.init", [
                     {key: "IV_Key", value: fusion_bytesToBase64(ivKey)},
-                    {key: "Auth_Tag_Length", value: tLen.toString()}
+                    {key: "Auth_Tag_Length", value: tLen.toString()},
+                    {key: "ClassType", value: fusion_getClassName(this)}
                 ]);
                 return this.$init.overload("int", "[B").call(this, tLen, ivKey);
             }
@@ -518,7 +505,8 @@ setTimeout(function() {
                     {key: "IV_Key", value: fusion_bytesToBase64(ivKey)},
                     {key: "Auth_Tag_Length", value: tLen.toString()},
                     {key: "Offset", value: offset},
-                    {key: "Length", value: len}
+                    {key: "Length", value: len},
+                    {key: "ClassType", value: fusion_getClassName(this)}
                 ]);
                 return this.$init.overload("int", "[B", "int", "int").call(this, tLen, ivKey, offset, len);
             }
@@ -530,7 +518,8 @@ setTimeout(function() {
             pbeParameter.$init.overload("[B", "int").implementation = function (salt, iterationCount) {
                 fusion_sendKeyValueData("PBEParameterSpec.init", [
                     {key: "PBE_Salt", value: fusion_bytesToBase64(salt)},
-                    {key: "Iteration_Count", value: iterationCount.toString()}
+                    {key: "Iteration_Count", value: iterationCount.toString()},
+                    {key: "ClassType", value: fusion_getClassName(this)},
                 ]);
                 return this.$init.overload("[B", "int").call(this, salt, iterationCount);
             }
@@ -539,7 +528,8 @@ setTimeout(function() {
                 
                 var data = [
                     {key: "PBE_Salt", value: fusion_bytesToBase64(salt)},
-                    {key: "Iteration_Count", value: iterationCount.toString()}
+                    {key: "Iteration_Count", value: iterationCount.toString()},
+                    {key: "ClassType", value: fusion_getClassName(this)}
                     
                 ]
 
@@ -547,6 +537,7 @@ setTimeout(function() {
                     data = data.concat([
                         {key: "Algorithm", value: paramSpec.getAlgorithm()},
                         {key: "ParamSpec", value: fusion_keyToBase64(paramSpec)},
+                        {key: "ParamSpecType", value: fusion_getClassName(paramSpec)},
                         {key: "Provider", value: paramSpec.getProvider()}
                     ]);
                 } catch (err) { }
@@ -561,7 +552,9 @@ setTimeout(function() {
             const x509EncodedKeySpec = Java.use("java.security.spec.X509EncodedKeySpec");
             x509EncodedKeySpec.$init.overload("[B").implementation = function (encodedKey) {
                 fusion_sendKeyValueData("X509EncodedKeySpec.init", [
-                    {key: "Key", value: fusion_bytesToBase64(encodedKey)}
+                    {key: "Key", value: fusion_bytesToBase64(encodedKey)},
+                    {key: "ClassType", value: fusion_getClassName(this)}
+
                 ]);
                 return this.$init.overload("[B").call(this, encodedKey);
             }

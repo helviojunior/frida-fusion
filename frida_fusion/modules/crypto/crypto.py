@@ -1,3 +1,4 @@
+import json
 import os.path
 from pathlib import Path
 import base64
@@ -31,10 +32,10 @@ class Crypto(ModuleBase):
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS [crypto] (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    algorithm TEXT NOT NULL,
-                    init_key TEXT NOT NULL,
+                    hashcode TEXT NOT NULL,
+                    algorithm TEXT NULL,
+                    init_key TEXT NULL,
                     iv TEXT NULL,
-                    hashcode TEXT NULL,
                     flow TEXT NULL,
                     key TEXT NULL,
                     clear_text TEXT NULL,
@@ -43,6 +44,21 @@ class Crypto(ModuleBase):
                     status TEXT NULL DEFAULT ('open'),
                     stack_trace TEXT NULL,
                     created_date datetime not null DEFAULT (datetime('now','localtime'))
+                );
+            """)
+
+            conn.commit()
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS [crypto_key] (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    key TEXT NULL,
+                    salt TEXT NULL,
+                    iteration_count INTEGER NULL DEFAULT (0),
+                    key_class TEXT NULL DEFAULT ('<unknown>'),
+                    additional_data TEXT NULL,
+                    created_date datetime not null DEFAULT (datetime('now','localtime')),
+                    UNIQUE (key, key_class)
                 );
             """)
 
@@ -80,7 +96,8 @@ class Crypto(ModuleBase):
                 return ''
 
         def update_crypto(self, iv=None, hashcode=None, flow=None, key=None, before_final=None,
-                          after_final=None, stack_trace=None, id=None):
+                          after_final=None, stack_trace=None, id=None, algorithm=None,
+                          status=None):
 
             conn = self.connect_to_db(check=False)
             cursor = conn.cursor()
@@ -118,6 +135,11 @@ class Crypto(ModuleBase):
 
                 if flow is not None:
                     integrity = True
+                    update += " algorithm = ?,"
+                    data.append(algorithm)
+
+                if flow is not None:
+                    integrity = True
                     update += " flow = ?,"
                     data.append(flow)
 
@@ -135,6 +157,11 @@ class Crypto(ModuleBase):
                     integrity = True
                     update += " stack_trace = ?,"
                     data.append(stack_trace)
+
+                if status is not None:
+                    integrity = True
+                    update += " status = ?,"
+                    data.append(status)
 
                 if before_final is not None:
                     integrity = True
@@ -168,6 +195,16 @@ class Crypto(ModuleBase):
                     # data.append(None)
 
                     cursor.execute(update, data)
+
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                    delete from [crypto]
+                    where algorithm is null and init_key is null and key is null and clear_text is null
+                    and hashcode in (
+                        select hashcode from [crypto]
+                        where id = ?
+                    )
+                    """, (id,))
 
                     conn.commit()
 
@@ -215,56 +252,43 @@ class Crypto(ModuleBase):
 
             # Color.pl('{+} {W}Inserindo crypto. {C}Algorithm: {O}%s{W}' % algorithm)
 
-        def insert_crypto(self, algorithm, init_key):
+        def insert_crypto(self, hashcode, algorithm, init_key):
 
-            conn = self.connect_to_db(check=False)
+            if hashcode is None:
+                return
 
-            cursor = conn.cursor()
-            cursor.execute("""
-            update [crypto] set status = 'incomplete' where status = 'open';
-            """)
-
-            cursor = conn.cursor()
-            cursor.execute("""
-            insert into [crypto] ([algorithm], [init_key])
-            VALUES (?,?);
-            """, (algorithm, init_key,))
-
-            conn.commit()
-
-            conn.close()
-
-            # Color.pl('{+} {W}Inserindo crypto. {C}Algorithm: {O}%s{W}' % algorithm)
-
-        def insert_crypto2(self, algorithm, key, iv, clear_text, cipher_data, flow='enc'):
-
-            conn = self.connect_to_db(check=False)
-
-            if isinstance(clear_text, bytes):
-                clear_text = clear_text.decode("UTF-8")
-
-            if isinstance(cipher_data, bytes):
-                cipher_data = cipher_data.decode("UTF-8")
-
-            if isinstance(key, bytes):
-                key = base64.b64encode(key).decode("UTF-8")
-
-            if isinstance(iv, bytes):
-                iv = base64.b64encode(iv).decode("UTF-8")
-
-            clear_text_b64 = base64.b64encode(clear_text.encode("UTF-8")).decode("UTF-8")
-
-            cursor = conn.cursor()
-            cursor.execute("""
-            insert into [crypto] ([flow], [algorithm], [init_key], [key], [iv], [clear_text], [clear_text_b64], [cipher_data], [status])
-            VALUES (?,?,?,?,?,?,?,?,?);
-            """, (flow, algorithm, key, key, iv, clear_text, clear_text_b64, cipher_data, 'complete',))
-
-            conn.commit()
-
-            conn.close()
-
-            # Color.pl('{+} {W}Inserindo crypto. {C}Algorithm: {O}%s{W}' % algorithm)
+            rows = self.select(
+                table_name='crypto',
+                hashcode=hashcode,
+                status='open'
+            )
+            if len(rows) == 0 or not any(iter([
+                True
+                for r in rows
+                if (
+                    (algorithm is not None and algorithm == r['algorithm'])
+                    or (r['algorithm'] is None or r['algorithm'].strip() == "")
+                ) and (
+                    (
+                        (init_key is not None and init_key != '' and init_key != 'IA==')
+                        and (init_key == r['init_key'] or init_key == r['key'])
+                    )
+                    or (r['init_key'] is None or r['init_key'].strip() == "")
+                )
+            ])):
+                if init_key is not None and init_key != '' and init_key != 'IA==':
+                    self.insert_one(
+                        table_name='crypto',
+                        hashcode=hashcode,
+                        algorithm=algorithm,
+                        init_key=init_key,
+                        status='open')
+                else:
+                    self.insert_one(
+                        table_name='crypto',
+                        hashcode=hashcode,
+                        algorithm=algorithm,
+                        status='open')
 
     def __init__(self):
         super().__init__('Crypto', 'Hook cryptography/hashing functions')
@@ -290,31 +314,123 @@ class Crypto(ModuleBase):
                         received_data: dict = None
                         ) -> bool:
 
-        if module == "secretKeySpec.init":
+        if module in ["X509EncodedKeySpec.init", "GCMParameterSpec.init", "PBEParameterSpec.init"]:
+
+            key_class = received_data.get('classtype', module)
+            salt = None
+            iteration_count = 0
+
+            key = received_data.get('key', None)
+            if module == "GCMParameterSpec.init":
+                key = received_data.get('iv_key', None)
+
+            if module == "PBEParameterSpec.init":
+                key = "None"
+                salt = received_data.get('pbe_salt', None)
+                iteration_count = received_data.get('iteration_count', None)
+
+            if key is not None and key != '' and key != 'IA==':
+                self._crypto_db.insert_ignore_one(
+                    table_name='crypto_key',
+                    key=key,
+                    key_class=key_class,
+                    salt=salt,
+                    iteration_count=iteration_count,
+                    additional_data=json.dumps(
+                        {
+                            **{"module": module},
+                            **received_data
+                        },
+                        default=Logger.json_serial
+                    )
+                )
+
+        if module == "SecretKeySpec.init":
             algorithm = received_data.get('algorithm', None)
-            bData = received_data.get('key', None)
-            self._crypto_db.insert_crypto(algorithm, bData)
+            key = received_data.get('key', None)
+            hashcode = received_data.get('hashcode', None)
+            key_class = received_data.get('classtype', "SecretKeySpec")
+            self._crypto_db.insert_crypto(
+                hashcode=hashcode,
+                algorithm=algorithm,
+                init_key=key)
+
+            if key is not None and key != '' and key != 'IA==':
+                self._crypto_db.insert_ignore_one(
+                    table_name='crypto_key',
+                    key=key,
+                    key_class=key_class
+                )
 
         elif module == "IvParameterSpec.init":
             bData = received_data.get('iv_key', None)
+            key_class = received_data.get('classtype', "IvParameterSpec")
             # print("IV: %s" % bData)
-            self._crypto_db.update_crypto(bData)
+            self._crypto_db.update_crypto(iv=bData)
+
+            if bData is not None and bData != '' and bData != 'IA==':
+                self._crypto_db.insert_ignore_one(
+                    table_name='crypto_key',
+                    key=bData,
+                    key_class=key_class,
+                    additional_data=json.dumps(
+                        {
+                            **{"module": module},
+                            **received_data
+                        },
+                        default=Logger.json_serial
+                    )
+                )
 
         elif module == "cipher.init":
             hashcode = received_data.get('hashcode', None)
             opmode = received_data.get('opmode', "")
-            if 'encrypt' in opmode:
-                self._crypto_db.update_crypto(None, hashcode, 'enc')
-            elif 'decrypt' in opmode:
-                self._crypto_db.update_crypto(None, hashcode, 'dec')
+            key_class = received_data.get('keytype', "")
+            key = received_data.get('key', None)
+            algorithm = received_data.get('algorithm', None)
+
+            self._crypto_db.insert_crypto(
+                hashcode=hashcode,
+                algorithm=algorithm,
+                init_key=key
+            )
+
+            self._crypto_db.update_crypto(
+                hashcode=hashcode,
+                flow='enc' if 'encrypt' in opmode else ('dec' if 'decrypt' in opmode else str(opmode)),
+                key=key,
+                algorithm=algorithm
+            )
+
+            if key is not None and key != '' and key != 'IA==':
+                self._crypto_db.insert_ignore_one(
+                    table_name='crypto_key',
+                    key=key,
+                    key_class=key_class
+                )
+
+            Logger.print_message(
+                level="W",
+                message=f"Cipher init received\nHashcode: {hashcode}\nOpmode: {opmode}\nKeytype: {key_class}",
+                script_location=script_location
+            )
 
         elif module == "cipher.doFinal":
-            self._crypto_db.update_crypto(None, None, None, None,
-                                          received_data.get('input', ''),
-                                          stack_trace=stack_trace)
-            self._crypto_db.update_crypto(None, None, None, None, None,
-                                          received_data.get('output', ''),
-                                          stack_trace=stack_trace)
+            hashcode = received_data.get('hashcode', None)
+
+            self._crypto_db.insert_crypto(
+                hashcode=hashcode,
+                algorithm=None,
+                init_key=None
+            )
+
+            self._crypto_db.update_crypto(
+                hashcode=hashcode,
+                before_final=received_data.get('input', ''),
+                after_final=received_data.get('output', ''),
+                stack_trace=stack_trace,
+                status="complete"
+            )
 
             Logger.print_message(
                 level="D",

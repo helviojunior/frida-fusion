@@ -82,6 +82,17 @@ class Database(object):
         conn.commit()
 
     @connect
+    def insert_if_not_exists(self, conn: Connection, table_name, **kwargs):
+        table_name = self.scrub(table_name)
+
+        if self.select_count(table_name=table_name, **kwargs) == 0:
+            (columns, values) = self.parse_args(kwargs)
+            sql = "INSERT INTO {} ({}) VALUES ({})" \
+                .format(table_name, ','.join(columns), ', '.join(['?'] * len(columns)))
+            conn.execute(sql, values)
+            conn.commit()
+
+    @connect
     def insert_ignore_one(self, conn: Connection, table_name, **kwargs):
         table_name = self.scrub(table_name)
         (columns, values) = self.parse_args(kwargs)

@@ -214,6 +214,35 @@ function fusion_printMethods(targetClass)
   });
 }
 
+function fusion_getClassName(obj)
+{
+  if (obj === null || obj === undefined) return "";
+
+  try {
+        // Caso seja um objeto Java real
+        if (obj.$className !== undefined) {
+            // Objetos instanciados via Java.use
+            return obj.$className;
+        }
+
+        // Caso seja uma instância Java (não necessariamente via Java.use)
+        if (Java.isJavaObject(obj)) {
+            return obj.getClass().getName();
+        }
+
+        // Caso seja uma classe Java carregada (Java.use)
+        if (Java.isJavaClass(obj)) {
+            return obj.class.getName();
+        }
+
+        // Se for algo não Java, apenas retorna tipo do JS
+        return typeof obj;
+    } catch (err) {
+        fusion_sendMessage("W", err);
+        return '';
+    }
+
+}
 
 Java.perform(function () {
   const Thread = Java.use('java.lang.Thread');
