@@ -59,7 +59,7 @@ class Logger(object):
             Color.pl(text)
 
     @classmethod
-    def _get_caller_info(cls, stack_index: int = 1) -> ScriptLocation:
+    def get_caller_info(cls, stack_index: int = 1) -> ScriptLocation:
         """Retrieves information about the calling script, function, and line number."""
         # inspect.stack() returns a list of frame records.
         # Each frame record is a tuple containing:
@@ -133,7 +133,7 @@ class Logger(object):
         tag_color = Color.color_tags[dbg_idx]
 
         if script_location is None:
-            script_location = cls._get_caller_info(stack_index=2)
+            script_location = cls.get_caller_info(stack_index=2)
 
         if script_location.file_name == "frida/node_modules/frida-java-bridge/lib/class-factory.js":
             file_name = "frida/.../class-factory.js"

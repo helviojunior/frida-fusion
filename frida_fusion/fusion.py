@@ -423,7 +423,10 @@ class Fusion(object):
                     received_data=received_data
                 )
             except Exception as e:
-                self.print_message("E", f"Error resizing event to module {m.name}: {str(e)}")
+                if Configuration.debug_level >= 2:
+                    self.print_message("E", f"Error resizing event to module {m.name}: {str(e)}")
+                else:
+                    self.print_exception(e)
 
     def _raise_data_event(self,
                           script_location: ScriptLocation = None,
@@ -437,7 +440,10 @@ class Fusion(object):
                     received_data=received_data
                 )
             except Exception as e:
-                self.print_message("E", f"Error resizing event to module {m.name}: {str(e)}")
+                if Configuration.debug_level >= 2:
+                    self.print_message("E", f"Error resizing event to module {m.name}: {str(e)}")
+                else:
+                    self.print_exception(e)
 
     @classmethod
     def insert_history(cls,  source: str, data: str, stack_trace: str = ''):
@@ -458,16 +464,19 @@ class Fusion(object):
     @classmethod
     def print_exception(cls, err):
         from traceback import format_exc
-        err_txt = '{R}Error:{O} %s{W}' % str(err)
-        err_txt += '{O}Full stack trace below'
+        err_txt = 'Error:{O} %s{W}' % str(err)
+        err_txt += '\n{O}Full stack trace below\n'
         err_txt += format_exc().strip()
 
-        err_txt = err_txt.replace('\n', '\n{W}{!} {W}   ')
+        err_txt = err_txt.replace('\n', '\n{W}   ')
         err_txt = err_txt.replace('  File', '{W}{D}File')
         err_txt = err_txt.replace('  Exception: ', '{R}Exception: {O}')
-        cls.print_message(
+
+        Logger.print_message(
             level="E",
-            message=Color.s('{!}    ' + err_txt)
+            message=Color.s(err_txt),
+            filename_col_len=Fusion.max_filename,
+            script_location=Logger.get_caller_info(stack_index=2)
         )
 
     @classmethod
