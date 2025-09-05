@@ -167,14 +167,14 @@ class Fusion(object):
             else:
                 Logger.pl("{*} Loading script file " + file_name)
                 for r in ["*", "-", "+", "!"]:
-                    file_data = file_data.replace(f"console.log('[{r}] ", f"sendMessage('{r}', '")
-                    file_data = file_data.replace(f'console.log("[{r}] ', f'sendMessage("{r}", "')
-                    file_data = file_data.replace(f"console.log('[{r}]", f"sendMessage('{r}', '")
-                    file_data = file_data.replace(f'console.log("[{r}]', f'sendMessage("{r}", "')
+                    file_data = file_data.replace(f"console.log('[{r}] ", f"fusion_sendMessage('{r}', '")
+                    file_data = file_data.replace(f'console.log("[{r}] ', f'fusion_sendMessage("{r}", "')
+                    file_data = file_data.replace(f"console.log('[{r}]", f"fusion_sendMessage('{r}', '")
+                    file_data = file_data.replace(f'console.log("[{r}]', f'fusion_sendMessage("{r}", "')
 
-                file_data = re.sub(r'(?<!\w)send\(', 'iSend(', file_data)
+                file_data = re.sub(r'(?<!\w)send\(', 'fusion_Send(', file_data)
 
-                file_data = file_data.replace(f'console.log(', f'sendMessage("I", ')
+                file_data = file_data.replace(f'console.log(', f'fusion_sendMessage("I", ')
                 file_data += "\n\n"
 
                 line_cnt = len(file_data.split("\n")) - 1
@@ -371,7 +371,11 @@ class Fusion(object):
                         for m in matches:
                             stack = stack.replace(m[0], f"{m[1].file_name}:{m[1].line}")
 
-                        if script_location.file_name == "class-factory.js" and len(matches) == 1:
+                        if script_location.file_name == "fusion_bundle.js" and len(matches) >= 1:
+                            script_location.file_name = matches[0][1].file_name
+                            script_location.line = matches[0][1].line
+
+                        elif script_location.file_name == "class-factory.js" and len(matches) == 1:
                             script_location.file_name = matches[0][1].file_name
                             script_location.line = matches[0][1].line
 

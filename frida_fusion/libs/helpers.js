@@ -1,9 +1,16 @@
-/*  Android Scripts
-    Author: Hélvio - M4v3r1ck
+/*  Frida Fusion helper functions
+    Author: Helvio Junior - M4v3r1ck
 */
 
+function fusion_Send(payload1, payload2){
+    const info = fusion_getCallerInfo();
+    send({
+      payload: payload1,
+      location: info
+    }, payload2);
+}
 
-function waitForClass(name, onReady) {
+function fusion_waitForClass(name, onReady) {
     var intv = setInterval(function () {
       try {
         var C = Java.use(name);
@@ -13,24 +20,24 @@ function waitForClass(name, onReady) {
     }, 100);
 }
 
-function printStackTrace(){
+function fusion_printStackTrace(){
     var trace = Java.use("android.util.Log").getStackTraceString(Java.use("java.lang.Exception").$new());
     trace = trace.replace("java.lang.Exception\n", "Stack trace:\n");
-    sendMessage("*", trace);
+    fusion_sendMessage("I", trace);
 }
 
-function toBytes(message){
+function fusion_toBytes(message){
     try{
         const StringClass = Java.use('java.lang.String');
         var bTxt = StringClass.$new(message).getBytes('utf-8');
 
         return bTxt;
     } catch (err) {
-        sendMessage("*", err)
+        fusion_sendMessage("W", err)
     }
 }
 
-function toBase64(message){
+function fusion_stringToBase64(message){
     try{
         const StringClass = Java.use('java.lang.String');
         const Base64Class = Java.use('android.util.Base64');
@@ -39,19 +46,19 @@ function toBase64(message){
 
         return b64Msg;
     } catch (err) {
-        sendMessage("*", err)
+        fusion_sendMessage("W", err)
     }
 }
 
-function bytesToBase64(message){
+function fusion_bytesToBase64(byteArray){
 
-    if (message === null || message === undefined) return "IA==";
+    if (byteArray === null || byteArray === undefined) return "IA==";
     try {
         // 1) Confirma tipo byte[], se não tenta converter em string
-        message = Java.array('byte', message);
+        byteArray = Java.array('byte', byteArray);
 
         // 2) Tem 'length' numérico
-        const len = message.length;
+        const len = byteArray.length;
         if (typeof len !== "number") return "IA==";
 
         // 3) (opcional) Exigir conteúdo
@@ -64,16 +71,16 @@ function bytesToBase64(message){
     try{
         
         const Base64Class = Java.use('android.util.Base64');
-        var b64Msg = Base64Class.encodeToString(message, 0x00000002); //Base64Class.NO_WRAP = 0x00000002
+        var b64Msg = Base64Class.encodeToString(byteArray, 0x00000002); //Base64Class.NO_WRAP = 0x00000002
 
         return b64Msg;
     } catch (err) {
-        sendMessage("*", err)
+        fusion_sendMessage("W", err)
         return "IA==";
     }
 }
 
-function getCallerInfo() {
+function fusion_getCallerInfo() {
   try{
     const stack = new Error().stack.split("\n");
 
@@ -89,9 +96,9 @@ function getCallerInfo() {
         const file = m[2];
         const ln   = parseInt(m[3], 10);
 
-        // Ignora funções cujo nome comece com "send" (qualquer case)
+        // Ignore helper functions (with name "send")
         if (/^send/i.test(func)) continue;
-        if (/^isend/i.test(func)) continue;
+        if (/^fusion_Send/i.test(func)) continue;
 
         return { file_name: file, function_name: func, line: ln };
       }
@@ -102,29 +109,8 @@ function getCallerInfo() {
   return null;
 }
 
-function iSend(payload1, payload2){
-    try{
-        const info = getCallerInfo();
-        send({
-          payload: payload1,
-          location: info
-        }, payload2);
-    } catch (err) {
-        //sendMessage("*", err)
-        console.log(`Error: ${err}`)
-    }
-}
-
-function sendData(mType, jData, bData){
-    //iSend('{"type" : "'+ mType +'", "jdata" : "'+ jData +'"}', bData);
-    iSend({
-      type: mType,
-      jdata: jData
-    }, bData)
-}
-
-function sendKeyValueData(module, items) {
-    var st = getB64StackTrace();
+function fusion_sendKeyValueData(module, items) {
+    var st = fusion_getB64StackTrace();
 
     var data = [];
 
@@ -133,28 +119,16 @@ function sendKeyValueData(module, items) {
         data = data.concat([{key: `${items[i].key}`, value:`${items[i].value}`}]);
     }
 
-    iSend({
+    fusion_Send({
       type: "key_value_data",
       module: module,
       data: data,
       stack_trace: st
     }, null);
 
-
-    /*
-    var jData = `{"type" : "key_value_data", "module": "${module}", "data": [`;
-    for (let i = 0; i < items.length; i++) {
-        if (i > 0) {
-            jData += `, `
-        }
-        jData += `{"key": "${items[i].key}", "value": "${items[i].value}"}`
-    }
-    jData += `], "stack_trace": "${st}"}`;
-    iSend(jData, "");
-    */
 }
 
-function sendMessage(level, message){
+function fusion_sendMessage(level, message){
     try{
         const StringClass = Java.use('java.lang.String');
         const Base64Class = Java.use('android.util.Base64');
@@ -162,38 +136,58 @@ function sendMessage(level, message){
         var b64Msg = Base64Class.encodeToString(bTxt, 0x00000002); //Base64Class.NO_WRAP = 0x00000002
 
         //send('{"type" : "message", "level" : "'+ level +'", "message" : "'+ b64Msg +'"}');
-        iSend({
+        fusion_Send({
           type: "message",
           level: level,
           message: b64Msg
         }, null)
     } catch (err) {
-        sendMessage("*", err)
-        //sendMessage('-', 'secret_key_spec.$init.overload error: ' + err + '\n' + err.stack);
+        fusion_sendMessage("W", err)
     }
 }
 
-function sendError(error) {
+function fusion_sendMessageWithTrace(level, message){
     try{
-        sendMessage("-", error + '\n' + error.stack);
+        const StringClass = Java.use('java.lang.String');
+        const Base64Class = Java.use('android.util.Base64');
+
+        var trace = Java.use("android.util.Log").getStackTraceString(Java.use("java.lang.Exception").$new());
+        trace = trace.replace("java.lang.Exception\n", "Stack trace:\n");
+        message += "\n"
+        message += trace
+
+        var bTxt = StringClass.$new(message).getBytes('utf-8');
+        var b64Msg = Base64Class.encodeToString(bTxt, 0x00000002); //Base64Class.NO_WRAP = 0x00000002
+
+        //send('{"type" : "message", "level" : "'+ level +'", "message" : "'+ b64Msg +'"}');
+        fusion_Send({
+          type: "message",
+          level: level,
+          message: b64Msg
+        }, null)
     } catch (err) {
-        sendMessage("*", err)
+        fusion_sendMessage("W", err)
     }
 }
 
-function encodeHex(byteArray) {
+function fusion_sendError(error) {
+    try{
+        fusion_sendMessage("E", error + '\n' + error.stack);
+    } catch (err) {
+        fusion_sendMessage("W", err)
+    }
+}
+
+function fusion_encodeHex(byteArray) {
     
     const HexClass = Java.use('org.apache.commons.codec.binary.Hex');
     const StringClass = Java.use('java.lang.String');
     const hexChars = HexClass.encodeHex(byteArray);
-    //sendMessage("*", StringClass.$new(hexChars).toString());
-    //Buffer.from(bufStr, 'utf8');
-    //sendMessage("*", new Uint8Array(byteArray));
     return StringClass.$new(hexChars).toString();
     
 }
 
-function getB64StackTrace(){
+function fusion_getB64StackTrace(){
 
     try{
         const StringClass = Java.use('java.lang.String');
@@ -206,33 +200,18 @@ function getB64StackTrace(){
         return b64Msg
 
     } catch (err) {
-        sendMessage("*", err);
+        fusion_sendMessage("W", err);
         return '';
     }
 }
 
-function enumMethods(targetClass)
+function fusion_printMethods(targetClass)
 {
   var hook = Java.use(targetClass);
   var ownMethods = hook.class.getDeclaredMethods();
-  hook.$dispose;
-
-  return ownMethods;
-}
-
-function printMethods(hook)
-{
-  var ownMethods = hook.class.getDeclaredMethods();
-  ownMethods.forEach(function(s) { 
-    //sendMessage(s);
-    sendMessage('*', s);
+  ownMethods.forEach(function(s) {
+    fusion_sendMessage('I', s);
   });
-
-}
-
-function intToHex(intVal)
-{
-    return intVal.toString(16);
 }
 
 
@@ -263,7 +242,7 @@ Java.perform(function () {
   Thread.setDefaultUncaughtExceptionHandler(UEH.$new());
 });
 
-function formatBacktrace(frames) {
+function fusion_formatBacktrace(frames) {
   return frames.map((addr, i) => {
     const sym = DebugSymbol.fromAddress(addr);
     const mod = Process.findModuleByAddress(addr);
@@ -282,7 +261,7 @@ Process.setExceptionHandler(function (details) {
     frames = Thread.backtrace(details.context, Backtracer.FUZZY);
   }
 
-  const pretty = formatBacktrace(frames);
+  const pretty = fusion_formatBacktrace(frames);
 
   send({
     type: "native-exception",
@@ -302,4 +281,4 @@ Process.setExceptionHandler(function (details) {
   return false;
 });
 
-sendMessage("W", "Helper functions have been successfully initialized.")
+fusion_sendMessage("W", "Helper functions have been successfully initialized.")
