@@ -89,9 +89,19 @@ jobs:
           python -m pip install setuptools
           python -m pip install -r tests/requirements-test.txt
 
-      - name: Install Frida Fusion
+      - name: Remove requirements.txt
+        if: "!contains(matrix.os, 'windows')"
         run: |
           rm -rf requirements.txt
+
+      - name: Remove requirements.txt
+        if: "contains(matrix.os, 'windows')"
+        shell: cmd
+        run: |
+          del /F /Q requirements.txt
+
+      - name: Install Frida Fusion
+        run: |
           pip install .
 
       - name: Run unit tests
