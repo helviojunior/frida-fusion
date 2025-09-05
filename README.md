@@ -34,11 +34,8 @@ Modules:
 
 ## Install
 
-> :information_source: We recommend using `pipx` rather than `pip` for system-wide installation.
-
 ```
-python3 -m pipx install frida-fusion
+pip3 install frida-fusion
 ```
 
-> :information_source: Check whether you also need to run the `python3 -m pipx ensurepath` command.
 

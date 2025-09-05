@@ -60,6 +60,8 @@ exclude = ["frida_fusion*tests", "frida_fusion*images", "frida_fusion*docs"]
   'resources/**/*',
   'modules/*',
   'modules/**/*',
+  'libs/*',
+  'libs/**/*',
 ]
 
 [project.urls]
