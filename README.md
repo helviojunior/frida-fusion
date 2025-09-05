@@ -55,15 +55,24 @@ frida-fusion -f [app_id] -U --script-path /tmp/scripts
 The Frida Fusion define/expose several functions to be used at frida scripts. Follows the typedef of these functions.
 
 ```java
-void    fusion_waitForClass(String name, CallbackFunction onReady)
-void    fusion_printStackTrace();
+# Send message/data to Frida-Fusion
 void    fusion_sendMessage(String level, String message);
 void    fusion_sendMessageWithTrace(String level, String message);
+void    fusion_sendKeyValueData(String module, Object items);
+
+# Print StackTrace
+void    fusion_printStackTrace();
+
+# Print all methods of class 'name'
+void    fusion_printMethods(String name);
+
+# Wait until the class 'name' exists in memory to execute the callback function
+void    fusion_waitForClass(String name, CallbackFunction onReady)
+
+# Conversions
 byte[]  fusion_stringToBase64(String message);
 String  fusion_bytesToBase64(byte[] byteArray);
-void    fusion_sendKeyValueData(String module, Object items);
 String  fusion_encodeHex(byte[] byteArray);
-void    fusion_printMethods(String name);
 ```
 
 ## Module engine
