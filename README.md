@@ -38,6 +38,34 @@ Modules:
 pip3 install frida-fusion
 ```
 
+## Custom Frida script
+
+You must provide a custom Frida script as usual. To do this you must provide `-s/--script-path` parameter.
+
+```bash
+# Just one file
+frida-fusion -f [app_id] -U --script-path mytest.js
+
+# A entire directory
+frida-fusion -f [app_id] -U --script-path /tmp/scripts
+```
+
+### Exposed JavaScript (frida) functions
+
+The Frida Fusion define/expose several functions to be used at frida scripts. Follows the typedef of these functions.
+
+```java
+void    fusion_waitForClass(String name, CallbackFunction onReady)
+void    fusion_printStackTrace();
+void    fusion_sendMessage(String level, String message);
+void    fusion_sendMessageWithTrace(String level, String message);
+byte[]  fusion_stringToBase64(String message);
+String  fusion_bytesToBase64(byte[] byteArray);
+void    fusion_sendKeyValueData(String module, Object items);
+String  fusion_encodeHex(byte[] byteArray);
+void    fusion_printMethods(String name);
+```
+
 ## Module engine
 
 You can check available modules with `frida-fusion --list-modules` command.
@@ -69,7 +97,7 @@ export FUSION_MODULES=/tmp/modules
 frida-fusion --list-modules
 
 # Using available module
-frida-fusion -f [app_id] -U --script-path . -m [module_name]
+frida-fusion -f [app_id] -U --script-path mytest.js -m [module_name]
 ```
 
 At windows:
@@ -81,7 +109,7 @@ $env:FUSION_MODULES = "C:\extra_mods"
 frida-fusion --list-modules
 
 # Using available module
-frida-fusion -f [app_id] -U --script-path . -m [module_name]
+frida-fusion -f [app_id] -U --script-path mytest.js -m [module_name]
 ```
 
 ### Community modules
@@ -96,3 +124,4 @@ export FUSION_MODULES=/tmp/frida-fusion-community-modules
 # List all modules
 frida-fusion --list-modules
 ```
+
