@@ -154,8 +154,9 @@ jobs:
           if [ -z "$VER" ]; then
             VER="0.0.0"
           fi
+          BUILDDT=$(date '+%Y%m%d%H%M%S')
           GITHASH=$(git rev-parse --short HEAD)
-          meta=$(cat frida_fusion/__meta__.py | sed "s/__version__.*/__version__ = '"${VER}"'/" | sed "s/__build__.*/__build__ = 0x"${GITHASH}"/")
+          meta=$(cat frida_fusion/__meta__.py | sed "s/__version__.*/__version__ = '"${VER}"-"${BUILDDT}"'/" | sed "s/__build__.*/__build__ = 0x"${GITHASH}"/")
           echo "$meta" > frida_fusion/__meta__.py
 
       - name: Install Frida Fusion
