@@ -119,7 +119,7 @@ jobs:
         run: |
           VER=$(echo '${{ github.event.release.tag_name }}' | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
           GITHASH=$(git rev-parse --short HEAD)
-          meta=$(cat frida_fusion/__meta__.py | sed "s/__version__.*/__version__ = '"${VER}"'/" | sed "s/__build__.*/__build__ = 0x"${VER}"/")
+          meta=$(cat frida_fusion/__meta__.py | sed "s/__version__.*/__version__ = '"${VER}"'/" | sed "s/__build__.*/__build__ = 0x"${GITHASH}"/")
           echo "$meta" > frida_fusion/__meta__.py
 
       - name: Build artifact
