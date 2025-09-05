@@ -41,7 +41,7 @@ class Logger(object):
         if Logger.out_file != '':
             try:
                 with open(Logger.out_file, "a") as text_file:
-                    text_file.write(Color.sc(text) + '\n')
+                    text_file.write(Color.escape_ansi(Color.sc(text)) + '\n')
             except:
                 pass
 
