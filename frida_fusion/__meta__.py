@@ -1,4 +1,4 @@
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 __title__ = "Frida Fusion"
 __description__ = "📱 frida-fusion - runtime mobile exploration"
 __url__ = "https://github.com/helviojunior/frida-fusion"
