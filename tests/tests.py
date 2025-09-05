@@ -6,7 +6,7 @@ import struct
 from pprint import pprint
 import pytest, sys
 
-from ..frida_fusion.libs.color import Color
+from frida_fusion.libs.color import Color
 
 
 def test_01_none():
