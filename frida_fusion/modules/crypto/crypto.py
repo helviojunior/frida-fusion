@@ -53,6 +53,7 @@ class Crypto(ModuleBase):
                 CREATE TABLE IF NOT EXISTS [crypto_key] (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     key TEXT NULL,
+                    printable_key TEXT NULL,
                     salt TEXT NULL,
                     iteration_count INTEGER NULL DEFAULT (0),
                     key_class TEXT NULL DEFAULT ('<unknown>'),
@@ -290,6 +291,22 @@ class Crypto(ModuleBase):
                         algorithm=algorithm,
                         status='open')
 
+        def insert_crypto_key(self, key, key_class, salt=None,
+                              iteration_count=0, module="<unknown>", additional_data=dict):
+            if key is not None and key != '' and key != 'IA==':
+                self.insert_ignore_one(
+                    table_name='crypto_key',
+                    key=key,
+                    printable_key=self.get_printable(key),
+                    key_class=key_class,
+                    salt=salt,
+                    iteration_count=iteration_count,
+                    additional_data=json.dumps({
+                        **{"module": module},
+                        **(additional_data if additional_data is not None and isinstance(additional_data, dict) else {})
+                    }, default=Logger.json_serial)
+                )
+
     def __init__(self):
         super().__init__('Crypto', 'Hook cryptography/hashing functions')
         self._crypto_db = None
@@ -329,21 +346,14 @@ class Crypto(ModuleBase):
                 salt = received_data.get('pbe_salt', None)
                 iteration_count = received_data.get('iteration_count', None)
 
-            if key is not None and key != '' and key != 'IA==':
-                self._crypto_db.insert_ignore_one(
-                    table_name='crypto_key',
-                    key=key,
-                    key_class=key_class,
-                    salt=salt,
-                    iteration_count=iteration_count,
-                    additional_data=json.dumps(
-                        {
-                            **{"module": module},
-                            **received_data
-                        },
-                        default=Logger.json_serial
-                    )
-                )
+            self._crypto_db.insert_crypto_key(
+                key=key,
+                key_class=key_class,
+                salt=salt,
+                iteration_count=iteration_count,
+                module=module,
+                additional_data=received_data
+            )
 
         if module == "SecretKeySpec.init":
             algorithm = received_data.get('algorithm', None)
@@ -355,12 +365,12 @@ class Crypto(ModuleBase):
                 algorithm=algorithm,
                 init_key=key)
 
-            if key is not None and key != '' and key != 'IA==':
-                self._crypto_db.insert_ignore_one(
-                    table_name='crypto_key',
-                    key=key,
-                    key_class=key_class
-                )
+            self._crypto_db.insert_crypto_key(
+                key=key,
+                key_class=key_class,
+                module=module,
+                additional_data=received_data
+            )
 
         elif module == "IvParameterSpec.init":
             bData = received_data.get('iv_key', None)
@@ -368,19 +378,12 @@ class Crypto(ModuleBase):
             # print("IV: %s" % bData)
             self._crypto_db.update_crypto(iv=bData)
 
-            if bData is not None and bData != '' and bData != 'IA==':
-                self._crypto_db.insert_ignore_one(
-                    table_name='crypto_key',
-                    key=bData,
-                    key_class=key_class,
-                    additional_data=json.dumps(
-                        {
-                            **{"module": module},
-                            **received_data
-                        },
-                        default=Logger.json_serial
-                    )
-                )
+            self._crypto_db.insert_crypto_key(
+                key=bData,
+                key_class=key_class,
+                module=module,
+                additional_data=received_data
+            )
 
         elif module == "cipher.init":
             hashcode = received_data.get('hashcode', None)
@@ -402,12 +405,10 @@ class Crypto(ModuleBase):
                 algorithm=algorithm
             )
 
-            if key is not None and key != '' and key != 'IA==':
-                self._crypto_db.insert_ignore_one(
-                    table_name='crypto_key',
-                    key=key,
-                    key_class=key_class
-                )
+            self._crypto_db.insert_crypto_key(
+                key=key,
+                key_class=key_class
+            )
 
             Logger.print_message(
                 level="W",
