@@ -3,7 +3,7 @@ requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-dynamic = ["version", "dependencies"]
+dynamic = ["version"]
 name = "frida-fusion"
 description = "Hook your mobile tests with Frida"
 readme = {file = "README.md", content-type = "text/markdown"}
@@ -27,6 +27,12 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: PyPy",
   "Topic :: Security",
   "Topic :: Utilities"
+]
+dependencies = [
+  "colorama",
+  "requests>=2.23.0",
+  "frida>=15.1.17",
+  "frida-tools>=10.8.0"
 ]
 
 authors = [
@@ -64,7 +70,6 @@ Author = "https://github.com/helviojunior"
 
 [tool.setuptools.dynamic]
 version = {attr = "frida_fusion.__meta__.__version__"}
-dependencies = {file = [ "requirements.txt" ]}
 
 [project.scripts]
 frida-fusion = "frida_fusion.fusion:run"
