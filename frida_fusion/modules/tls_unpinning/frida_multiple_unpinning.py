@@ -1,14 +1,9 @@
 import errno
 import os.path
-import tempfile
 from pathlib import Path
 from frida_fusion.libs.logger import Logger
+from frida_fusion.libs.scriptlocation import ScriptLocation
 from frida_fusion.module import ModuleBase
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from frida_fusion.fusion import Fusion  # só no type checker
 
 
 class TlsUnpinning(ModuleBase):
@@ -49,7 +44,7 @@ class TlsUnpinning(ModuleBase):
         ]
 
     def key_value_event(self,
-                        script_location: "Fusion.ScriptLocation" = None,
+                        script_location: ScriptLocation = None,
                         stack_trace: str = None,
                         module: str = None,
                         received_data: dict = None
@@ -57,7 +52,7 @@ class TlsUnpinning(ModuleBase):
         return True
 
     def data_event(self,
-                   script_location: "Fusion.ScriptLocation" = None,
+                   script_location: ScriptLocation = None,
                    stack_trace: str = None,
                    received_data: str = None
                    ) -> bool:

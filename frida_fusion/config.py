@@ -168,13 +168,15 @@ class Configuration(object):
 
         if args.show_time:
             Configuration.print_timestamp = True
+        Logger.print_timestamp = Configuration.print_timestamp
 
-        if str(args.debug_level).upper() not in Color.level_map.keys():
+        if str(args.debug_level).upper() not in Logger.level_map.keys():
             Color.pl(
                 '{!} {R}error: invalid debug level{R}{W}\r\n')
             Configuration.mandatory()
 
-        Configuration.debug_level = Color.level_map.get(str(args.debug_level).upper(), 0)
+        Configuration.debug_level = Logger.level_map.get(str(args.debug_level).upper(), 0)
+        Logger.debug_level = Configuration.debug_level
 
         Logger.pl('     {C}min debug level:{O} %s{W}' % str(args.debug_level).upper())
 

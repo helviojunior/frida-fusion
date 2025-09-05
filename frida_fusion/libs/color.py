@@ -52,21 +52,6 @@ class Color(object):
         "\033[31m\033[48;2;60;60;60m",  # Fatal
     ]
 
-    level_map = {
-        "V": 0,
-        "D": 1,
-        "I": 2,
-        "W": 3,
-        "E": 4,
-        "F": 5,
-    }
-
-    level_tag = {
-        "*": "D",
-        "+": "I",
-        "-": "W",
-    }
-
     last_sameline_length = 0
 
     @staticmethod

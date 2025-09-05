@@ -5,11 +5,8 @@ import string
 
 from frida_fusion.libs.logger import Logger
 from frida_fusion.libs.database import Database
+from frida_fusion.libs.scriptlocation import ScriptLocation
 from frida_fusion.module import ModuleBase
-
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from frida_fusion.fusion import Fusion  # só no type checker
 
 
 class Crypto(ModuleBase):
@@ -287,7 +284,7 @@ class Crypto(ModuleBase):
         ]
 
     def key_value_event(self,
-                        script_location: "Fusion.ScriptLocation" = None,
+                        script_location: ScriptLocation = None,
                         stack_trace: str = None,
                         module: str = None,
                         received_data: dict = None
@@ -319,6 +316,12 @@ class Crypto(ModuleBase):
                                           received_data.get('output', ''),
                                           stack_trace=stack_trace)
 
+            Logger.print_message(
+                level="D",
+                message="Cipher doFinal received",
+                script_location=script_location
+            )
+
         elif module == "messageDigest.update":
             hashcode = received_data.get('hashcode', None)
             algorithm = received_data.get('algorithm', None)
@@ -332,10 +335,26 @@ class Crypto(ModuleBase):
             bOutput = received_data.get('output', None)
             self._crypto_db.insert_digest(hashcode, algorithm, bInput, bOutput, stack_trace=stack_trace)
 
+            hash_hex = ""
+            if bOutput is not None:
+                try:
+                    if isinstance(bOutput, bytes):
+                        hash_hex = ''.join('{:02x}'.format(b) for b in bOutput)
+                    else:
+                        hash_hex = ''.join('{:02x}'.format(b) for b in base64.b64decode(bOutput))
+                except:
+                    pass
+
+            Logger.print_message(
+                level="D",
+                message=f"Message Digest calculated\n    Algorithm: {algorithm}\n    Hash: {hash_hex}",
+                script_location=script_location
+            )
+
         return True
 
     def data_event(self,
-                   script_location: "Fusion.ScriptLocation" = None,
+                   script_location: ScriptLocation = None,
                    stack_trace: str = None,
                    received_data: str = None
                    ) -> bool:

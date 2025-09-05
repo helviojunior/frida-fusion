@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .libs.color import Color
+from .libs.scriptlocation import ScriptLocation
 
 try:
     from .config import Configuration
@@ -15,7 +16,6 @@ import frida
 import json
 import base64
 import os
-import threading
 import signal
 import sys
 import re
@@ -29,43 +29,6 @@ from .libs.logger import Logger
 
 
 class Fusion(object):
-    class ScriptLocation(object):
-        def __init__(self, file_name: str = "<unknown>", function_name: str = "<unknown>", line: str = "<unknown>"):
-            self.file_name = file_name if file_name is not None else "<unknown>"
-            self.function_name = function_name if function_name is not None else "<unknown>"
-            self.line = str(line) if line is not None else "<unknown>"
-
-        def get_int_line(self):
-            try:
-                return int(self.line)
-            except:
-                return 0
-
-        def __str__(self):
-            return f"{self.file_name}:{self.line} ({self.function_name})"
-
-        def __repr__(self):
-            return str(self)
-
-        @staticmethod
-        def parse_from_dict(data: dict):
-
-            file_name = Path(data.get("file_name", "unknown")).name
-            function_name = data.get("function_name", "unknown")
-            line = str(data.get("line", -1))
-
-            if 'fileName' in data.keys():
-                file_name = Path(data.get("fileName", file_name)).name
-
-            if 'lineNumber' in data.keys():
-                line = str(data.get("lineNumber", line))
-
-            return Fusion.ScriptLocation(
-                file_name=file_name,
-                function_name=function_name,
-                line=line
-            )
-
     running = True
     debug = True
     print_timestamp = False
@@ -87,7 +50,12 @@ class Fusion(object):
         t.start()
 
     def signal_handler(self, sig, frame):
+        if Logger.debug_level <= 2:
+            Logger.debug_level = 2
+
+        Fusion.running = False
         Logger.pl('\n{!} {O}interrupted, shutting down...{W}\n')
+        time.sleep(0.5)
         self.done.set()
 
     def wait(self):
@@ -117,17 +85,17 @@ class Fusion(object):
 
         return self.device
 
-    def translate_location(self, location: dict) -> Fusion.ScriptLocation:
+    def translate_location(self, location: dict) -> ScriptLocation:
         if location is None or not isinstance(location, dict):
-            return Fusion.ScriptLocation()
+            return ScriptLocation()
 
-        loc = Fusion.ScriptLocation.parse_from_dict(location)
+        loc = ScriptLocation.parse_from_dict(location)
 
         if loc.file_name != "fusion_bundle.js":
             return loc
 
         return next(iter([
-            Fusion.ScriptLocation(
+            ScriptLocation(
                 file_name=k,
                 function_name=loc.function_name,
                 line=str(1 + loc.get_int_line() - v[0])
@@ -135,6 +103,25 @@ class Fusion(object):
             for k, v in self.script_trace.items()
             if v[0] <= loc.get_int_line() <= v[1]
         ]), loc)
+
+    @classmethod
+    def print_message(cls, level: str = "*", message: str = "",
+                      script_location: ScriptLocation = None):
+
+        if Fusion.running is False and Logger.debug_level >= 2:
+            return
+
+        if script_location is None:
+            script_location = ScriptLocation(
+                file_name=Fusion._script_name
+            )
+
+        Logger.print_message(
+            level=level,
+            message=message,
+            script_location=script_location,
+            filename_col_len=Fusion.max_filename
+        )
 
     def load_all_scripts(self):
         self.script_trace = {}
@@ -200,6 +187,8 @@ class Fusion(object):
                 if len(file_name) > Fusion.max_filename:
                     Fusion.max_filename = len(file_name)
 
+            Logger.filename_col_len = Fusion.max_filename
+
         try:
             s = self.session.create_script(src, name="fusion_bundle")
             s.on("message", self.make_handler("fusion_bundle.js"))  # register the message handler
@@ -247,9 +236,13 @@ class Fusion(object):
 
     def make_handler(self, script_name):
         def handler(message, payload):
+
+            if not Fusion.running:
+                return
+
             if message["type"] == "send":
                 try:
-                    script_location = Fusion.ScriptLocation()
+                    script_location = ScriptLocation()
                     jData = message.get("payload", {})
                     if isinstance(jData, str):
                         jData = json.loads(message["payload"])
@@ -285,10 +278,10 @@ class Fusion(object):
                             msg = base64.b64decode(msg).decode("UTF-8")
                         except:
                             pass
-                        self._print_message(mLevel, msg, script_location=script_location)
+                        self.print_message(mLevel, msg, script_location=script_location)
 
                     elif mType == "key_value_data":
-                        self._print_message("V", "RAW JSON:\n    %s" % (
+                        self.print_message("V", "RAW JSON:\n    %s" % (
                             json.dumps(jData, indent=4).replace("\n", "\n    ")
                         ), script_location=script_location)
 
@@ -318,7 +311,7 @@ class Fusion(object):
 
                     # Legacy
                     elif mType == "data":
-                        self._print_message("V", "RAW JSON:\n    %s" % (
+                        self.print_message("V", "RAW JSON:\n    %s" % (
                             json.dumps(jData, indent=4).replace("\n", "\n    ")
                         ), script_location=script_location)
 
@@ -342,19 +335,19 @@ class Fusion(object):
 
                     elif mType == "java-uncaught":
                         self.insert_history('frida', json.dumps(jData))
-                        self._print_message("E", jData.get('stack', ''), script_location=script_location)
+                        self.print_message("E", jData.get('stack', ''), script_location=script_location)
 
                     else:
-                        self._print_message(mLevel, message, script_location=script_location)
+                        self.print_message(mLevel, message, script_location=script_location)
 
                 except Exception as err:
-                    script_location = Fusion.ScriptLocation(file_name=Fusion._script_name)
-                    self._print_message("E", message, script_location=script_location)
-                    self._print_message("E", payload, script_location=script_location)
+                    script_location = ScriptLocation(file_name=Fusion._script_name)
+                    self.print_message("E", message, script_location=script_location)
+                    self.print_message("E", payload, script_location=script_location)
                     self.print_exception(err)
 
             else:
-                script_location = Fusion.ScriptLocation.parse_from_dict(message)
+                script_location = ScriptLocation.parse_from_dict(message)
                 try:
                     if message["type"] == "error":
                         description = message.get('description', '')
@@ -388,18 +381,18 @@ class Fusion(object):
                             "stack": stack
                         }))
 
-                        self._print_message("F", description + stack,
-                                            script_location=script_location)
+                        self.print_message("F", description + stack,
+                                           script_location=script_location)
                         Fusion.running = False
                         time.sleep(0.2)
                         Logger.pl('\n{+} {O}Exiting...{O}{W}')
                         self.done.set()
                     else:
-                        self._print_message("I", message, script_location=script_location)
-                        self._print_message("I", payload, script_location=script_location)
+                        self.print_message("I", message, script_location=script_location)
+                        self.print_message("I", payload, script_location=script_location)
                 except:
-                    self._print_message("I", message, script_location=script_location)
-                    self._print_message("I", payload, script_location=script_location)
+                    self.print_message("I", message, script_location=script_location)
+                    self.print_message("I", payload, script_location=script_location)
 
         return handler
 
@@ -417,7 +410,7 @@ class Fusion(object):
         self.done.set()
 
     def _raise_key_value_event(self,
-                               script_location: Fusion.ScriptLocation = None,
+                               script_location: ScriptLocation = None,
                                stack_trace: str = None,
                                module: str = None,
                                received_data: dict = None):
@@ -430,10 +423,10 @@ class Fusion(object):
                     received_data=received_data
                 )
             except Exception as e:
-                self._print_message("E", f"Error resizing event to module {m.name}: {str(e)}")
+                self.print_message("E", f"Error resizing event to module {m.name}: {str(e)}")
 
     def _raise_data_event(self,
-                          script_location: Fusion.ScriptLocation = None,
+                          script_location: ScriptLocation = None,
                           stack_trace: str = None,
                           received_data: str = None):
         for m in self._modules:
@@ -444,7 +437,7 @@ class Fusion(object):
                     received_data=received_data
                 )
             except Exception as e:
-                self._print_message("E", f"Error resizing event to module {m.name}: {str(e)}")
+                self.print_message("E", f"Error resizing event to module {m.name}: {str(e)}")
 
     @classmethod
     def insert_history(cls,  source: str, data: str, stack_trace: str = ''):
@@ -463,80 +456,19 @@ class Fusion(object):
             db.insert_history(**kwargs)
 
     @classmethod
-    def _print_message(cls, level: str = "*", message: str = "",
-                       script_location: Fusion.ScriptLocation = None):
-
-        if not Fusion.running and not Configuration.debug_level >= 2:
-            return
-
-        if level is None:
-            level = "*"
-
-        dbg_tag = next(iter([
-            k
-            for k in Color.level_map.keys()
-            if level.upper() == k
-        ]), Color.level_tag.get(level, "I"))
-
-        dbg_idx = Color.level_map.get(dbg_tag, 0)
-
-        if Configuration.debug_level > dbg_idx:
-            return
-
-        prefix = ""
-        if Configuration.print_timestamp:
-            ts = datetime.now()
-            stamp = f"{ts:%H:%M:%S}.{int(ts.microsecond / 1000):03d}"
-            prefix += f"\033[2m{stamp.ljust(13)}{Color.color_reset}"
-
-        fg_color = Color.color_level[dbg_idx]
-        tag_color = Color.color_tags[dbg_idx]
-
-        if script_location is None:
-            script_location = Fusion.ScriptLocation(
-                file_name=Fusion._script_name
-            )
-
-        if script_location.file_name == "frida/node_modules/frida-java-bridge/lib/class-factory.js":
-            file_name = "frida/.../class-factory.js"
-        else:
-            file_name = str(Path(script_location.file_name).name)
-
-        prefix += (f"{fg_color}{file_name.rjust(Fusion.max_filename)}"
-                   f"{Color.color_reset}\033[2m:{str(script_location.line).ljust(10)}"
-                   f"{Color.color_reset} ")
-        prefix_len = len(Color.escape_ansi(prefix))
-
-        f_message = ""
-        if message is None:
-            message = ""
-
-        if isinstance(message, dict):
-            try:
-                message = json.dumps(message, ident=4)
-            except:
-                message = str(message)
-
-        for line in message.split("\n"):
-            if f_message == "":
-                f_message += (f"{prefix}{tag_color} {dbg_tag} {Color.color_reset} "
-                              f"{fg_color}{line}{Color.color_reset}")
-            else:
-                f_message += (f"\n{''.rjust(prefix_len)}{tag_color} {dbg_tag} "
-                              f"{Color.color_reset} {fg_color}{line}{Color.color_reset}")
-
-        Logger.pl(f_message)
-
-    @classmethod
     def print_exception(cls, err):
-        Logger.pl('\n{!} {R}Error:{O} %s{W}' % str(err))
-        Logger.pl('\n{!} {O}Full stack trace below')
         from traceback import format_exc
-        err_txt = format_exc().strip()
+        err_txt = '{R}Error:{O} %s{W}' % str(err)
+        err_txt += '{O}Full stack trace below'
+        err_txt += format_exc().strip()
+
         err_txt = err_txt.replace('\n', '\n{W}{!} {W}   ')
         err_txt = err_txt.replace('  File', '{W}{D}File')
         err_txt = err_txt.replace('  Exception: ', '{R}Exception: {O}')
-        Logger.pl('{!}    ' + err_txt)
+        cls.print_message(
+            level="E",
+            message=Color.s('{!}    ' + err_txt)
+        )
 
     @classmethod
     def check_frida_native_exception(cls, evt: dict) -> bool:
