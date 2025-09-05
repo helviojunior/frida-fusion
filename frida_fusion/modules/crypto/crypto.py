@@ -318,7 +318,7 @@ class Crypto(ModuleBase):
 
             Logger.print_message(
                 level="D",
-                message="Cipher doFinal received",
+                message=f"Cipher doFinal received\n{stack_trace}",
                 script_location=script_location
             )
 
@@ -345,11 +345,13 @@ class Crypto(ModuleBase):
                 except:
                     pass
 
-            Logger.print_message(
-                level="D",
-                message=f"Message Digest calculated\n    Algorithm: {algorithm}\n    Hash: {hash_hex}",
-                script_location=script_location
-            )
+            # Do not print TLS certificate verification hash
+            if 'com.android.org.conscrypt.ConscryptEngine.verifyCertificateChain' not in stack_trace:
+                Logger.print_message(
+                    level="D",
+                    message=f"Message digest\nAlgorithm: {algorithm}\nHash: {hash_hex}\n{stack_trace}",
+                    script_location=script_location
+                )
 
         return True
 
