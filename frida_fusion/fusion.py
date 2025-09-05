@@ -216,7 +216,7 @@ class Fusion(object):
         self.session = self.device.attach(self.pid)
         self.session.on("detached", self.on_detached)
 
-        Logger.pl("{+} Iniciando scripts frida...")
+        Logger.pl("{+} Starting frida scripts")
         self.load_all_scripts()
         self.device.resume(self.pid)
 
@@ -227,7 +227,7 @@ class Fusion(object):
         self.session = self.device.attach(self.pid)
         self.session.on("detached", self.on_detached)
 
-        Logger.pl("{+} Iniciando scripts frida...")
+        Logger.pl("{+} Starting frida scripts")
         self.load_all_scripts()
         self.device.resume(self.pid)
 
@@ -242,7 +242,7 @@ class Fusion(object):
         self.session = self.device.attach(self.pid)
         self.session.on("detached", self.on_detached)
 
-        Logger.pl("{+} Iniciando scripts frida...")
+        Logger.pl("{+} Starting frida scripts")
         self.load_all_scripts()
 
     def make_handler(self, script_name):
@@ -631,16 +631,19 @@ class Fusion(object):
         Configuration.initialize()
 
         try:
+            print(f" 🛠️  Starting Frida Fusion instrumentation")
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            Logger.pl('{+} {C}Start time {O}%s{W}' % timestamp)
+
             self._modules = [
                 m.create_instance()
                 for _, m in Configuration.enabled_modules.items()
             ]
-            for m in self._modules:
-                m.start_db(db_path=Configuration.db_path)
 
-            print(f" 🛠️  Iniciando instrumentação Frida")
-            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            Logger.pl('{+} {C}Start time {O}%s{W}' % timestamp)
+            if len(self._modules) > 0:
+                Logger.pl("{+} Starting selected modules")
+                for m in self._modules:
+                    m.start_module(db_path=Configuration.db_path)
 
             self.get_device()
             if self.device is not None:

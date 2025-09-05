@@ -6,7 +6,7 @@ import sys
 import signal
 from pathlib import Path
 
-from .module import Module
+from .module import Module, ModuleManager, InternalModule, ExternalModule
 from .libs.color import Color
 from .libs.logger import Logger
 from .__meta__ import __version__
@@ -71,15 +71,27 @@ class Configuration(object):
         #show_help = any(['-h' == word for word in sys.argv])
 
         if list_modules:
-            mods = Module.list_modules()
+            mods = ModuleManager.list_modules()
+
+            if len(mods) == 0:
+                Color.pl('{!} {R}error: no modules found{R}{W}\r\n')
+                sys.exit(1)
+
             max_name = max(iter([
                 len(m.name) + 3
                 for _, m in mods.items()
             ] + [15]))
-            Color.pl(f"Available modules")
-            Color.pl(f"  {'Module Name'.ljust(max_name)} : Description")
-            for _, m in mods.items():
-                Color.pl(f"  {m.name.ljust(max_name)} : {m.description}")
+            Color.pl(f"Available internal modules")
+            for m in [m for _, m in mods.items() if isinstance(m, InternalModule)]:
+                Color.pl(f"  {m.safe_name().ljust(max_name)} : {m.description}")
+
+            Color.pl(f"\nAvailable external modules")
+            ext_mods = [m for _, m in mods.items() if isinstance(m, ExternalModule)]
+            if len(ext_mods) == 0:
+                Color.pl(("  No external modules available. You can set {G}FUSION_MODULES{W} environment variable "
+                          "to set an external modules Path"))
+            for m in ext_mods:
+                Color.pl(f"  {m.safe_name().ljust(max_name)} : {m.description}")
 
             print("")
             sys.exit(0)
@@ -167,19 +179,19 @@ class Configuration(object):
         Logger.pl('     {C}min debug level:{O} %s{W}' % str(args.debug_level).upper())
 
         if args.enabled_modules is not None and isinstance(args.enabled_modules, list):
-            mods = Module.list_modules()
+            mods = ModuleManager.list_modules()
             for mod in args.enabled_modules:
                 fm = next(iter([
                     m
                     for _, m in mods.items()
-                    if m.name.lower() == mod.lower()
+                    if m.safe_name() == mod.lower()
                 ]), None)
                 if fm is None:
                     Color.pl(
                         '{!} {R}error: module {O}%s{R} not found{W}\r\n' % mod)
                     sys.exit(1)
 
-                name = fm.name.lower()
+                name = fm.safe_name()
                 if name not in Configuration.enabled_modules.keys():
                     Configuration.enabled_modules[name] = fm
 

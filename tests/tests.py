@@ -7,15 +7,19 @@ from pprint import pprint
 import pytest, sys
 
 from frida_fusion.libs.color import Color
+from frida_fusion.module import Module
 
 
-def test_01_none():
+def test_01_modules():
     if sys.stdout.encoding is None:
         # Output is redirected to a file
         sys.stdout = codecs.getwriter('latin-1')(sys.stdout)
 
     try:
-        pass
+        mods = Module.list_modules()
+
+        if len(mods) == 0:
+            raise Exception("no modules found")
 
         assert True
     except Exception as e:

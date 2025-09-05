@@ -3,13 +3,13 @@ from pathlib import Path
 import base64
 import string
 
-from ..libs.color import Color
-from ..libs.database import Database
-from ..module import ModuleBase
+from frida_fusion.libs.logger import Logger
+from frida_fusion.libs.database import Database
+from frida_fusion.module import ModuleBase
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from ..fusion import Fusion  # só no type checker
+    from frida_fusion.fusion import Fusion  # só no type checker
 
 
 class Crypto(ModuleBase):
@@ -274,8 +274,11 @@ class Crypto(ModuleBase):
         self._crypto_db = None
         self.mod_path = str(Path(__file__).resolve().parent)
 
-    def start_db(self, db_path: str) -> bool:
-        self._crypto_db = Crypto.CryptoDB(db_name=db_path)
+    def start_module(self, **kwargs) -> bool:
+        if 'db_path' not in kwargs:
+            raise Exception("parameter db_path not found")
+
+        self._crypto_db = Crypto.CryptoDB(db_name=kwargs['db_path'])
         return True
 
     def js_files(self) -> list:
