@@ -57,6 +57,7 @@ __pycache__
 # Frida Scripts #
 #################
 **/frida_scripts/*
+**/tls_unpinning/*.js
 
 # Other sources #
 #################

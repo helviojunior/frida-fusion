@@ -261,6 +261,19 @@ class Fusion(object):
                         jData = jData.get("payload", {})
                         script_location = self.translate_location(location)
 
+                    if isinstance(jData, str):
+                        msg = jData
+                        try:
+                            msg = base64.b64encode(jData.encode("UTF-8"))
+                        except Exception:
+                            pass
+
+                        jData = {
+                            "type": "message",
+                            "level": "I",
+                            "message": msg
+                        }
+
                     if script_location.file_name == "<unknown>":
                         script_location.file_name = script_name
 
