@@ -28,8 +28,6 @@ classifiers = [
   "Topic :: Security",
   "Topic :: Utilities"
 ]
-
-[tool.pip-compile]
 dependencies = [
   "colorama",
   "requests>=2.23.0",
