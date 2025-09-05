@@ -8,7 +8,7 @@ name = "frida-fusion"
 description = "Hook your mobile tests with Frida"
 readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.9,<4"
-license = {file = "LICENSE"}
+license-files = ["LICEN[CS]E*"]
 keywords = ["Frida Fusion", "Frida", "Frida Scripts", "development", "red team"]
 classifiers = [
   "Development Status :: 4 - Beta",
