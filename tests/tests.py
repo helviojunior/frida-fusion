@@ -7,7 +7,7 @@ from pprint import pprint
 import pytest, sys
 
 from frida_fusion.libs.color import Color
-from frida_fusion.module import Module
+from frida_fusion.module import Module, ModuleManager
 
 
 def test_01_modules():
@@ -16,7 +16,7 @@ def test_01_modules():
         sys.stdout = codecs.getwriter('latin-1')(sys.stdout)
 
     try:
-        mods = Module.list_modules()
+        mods = ModuleManager.list_modules()
 
         if len(mods) == 0:
             raise Exception("no modules found")
