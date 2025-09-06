@@ -1,0 +1,2 @@
+## Crypto Hooks:
+* [ ] Shared SecretParameters

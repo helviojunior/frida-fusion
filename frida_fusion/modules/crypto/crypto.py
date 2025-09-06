@@ -407,7 +407,9 @@ class Crypto(ModuleBase):
 
             self._crypto_db.insert_crypto_key(
                 key=key,
-                key_class=key_class
+                key_class=key_class,
+                module=module,
+                additional_data=received_data
             )
 
             Logger.print_message(
