@@ -1,5 +1,5 @@
 
-const MODULES = {
+const CRYPTO_MODULES = {
     KeyGenerator: true,
     KeyPairGenerator: true,
     SecretKeySpec: true,
@@ -20,7 +20,7 @@ setTimeout(function() {
 
         const System = Java.use("java.lang.System");
 
-        if (MODULES.KeyGenerator) {
+        if (CRYPTO_MODULES.KeyGenerator) {
             fusion_sendMessage('*', "Module attached: javax.crypto.KeyGenerator");
             const keyGenerator = Java.use("javax.crypto.KeyGenerator");
 
@@ -54,7 +54,7 @@ setTimeout(function() {
 
         }
 
-        if (MODULES.KeyPairGenerator) {
+        if (CRYPTO_MODULES.KeyPairGenerator) {
             fusion_sendMessage('*', "Module attached: java.security.KeyPairGenerator");
             const keyPairGenerator = Java.use("java.security.KeyPairGenerator");
             keyPairGenerator.getInstance.overload("java.lang.String").implementation = function (arg0) {
@@ -81,7 +81,7 @@ setTimeout(function() {
             };
         }
 
-        if (MODULES.SecretKeySpec) {
+        if (CRYPTO_MODULES.SecretKeySpec) {
             fusion_sendMessage('*', "Module attached: javax.crypto.spec.SecretKeySpec");
             const secretKeySpec = Java.use("javax.crypto.spec.SecretKeySpec");
             secretKeySpec.$init.overload("[B", "java.lang.String").implementation = function (key, cipher) {
@@ -95,7 +95,7 @@ setTimeout(function() {
             }
         }
 
-        if (MODULES.MessageDigest) {
+        if (CRYPTO_MODULES.MessageDigest) {
             fusion_sendMessage('*', "Module attached: java.security.MessageDigest");
             const messageDigest = Java.use("java.security.MessageDigest");
             messageDigest.getInstance.overload("java.lang.String").implementation = function (arg0) {
@@ -144,7 +144,7 @@ setTimeout(function() {
 
         }
 
-        if (MODULES.SecretKeyFactory) {
+        if (CRYPTO_MODULES.SecretKeyFactory) {
             fusion_sendMessage('*', "Module attached: javax.crypto.SecretKeyFactory");
             const secretKeyFactory = Java.use("javax.crypto.SecretKeyFactory");
             secretKeyFactory.getInstance.overload("java.lang.String").implementation = function (arg0) {
@@ -171,7 +171,7 @@ setTimeout(function() {
             };
         }
 
-        if (MODULES.Signature) {
+        if (CRYPTO_MODULES.Signature) {
             fusion_sendMessage('*', "Module attached: java.security.Signature");
             const signature = Java.use("java.security.Signature");
             signature.getInstance.overload("java.lang.String").implementation = function (arg0) {
@@ -198,7 +198,7 @@ setTimeout(function() {
             };
         }
 
-        if (MODULES.Cipher) {
+        if (CRYPTO_MODULES.Cipher) {
             fusion_sendMessage('*', "Module attached: javax.crypto.Cipher");
             var iv_parameter_spec = Java.use("javax.crypto.spec.IvParameterSpec");
             var pbe_parameter_spec = Java.use("javax.crypto.spec.PBEParameterSpec");
@@ -365,7 +365,7 @@ setTimeout(function() {
         }
 
 
-        if (MODULES.Mac) {
+        if (CRYPTO_MODULES.Mac) {
             fusion_sendMessage('*', "Module attached: javax.crypto.Mac");
             const mac = Java.use("javax.crypto.Mac");
             mac.getInstance.overload("java.lang.String").implementation = function (arg0) {
@@ -392,7 +392,7 @@ setTimeout(function() {
             };
         }
 
-        if (MODULES.KeyGenParameterSpec) {
+        if (CRYPTO_MODULES.KeyGenParameterSpec) {
             fusion_sendMessage('*', "Module attached: android.security.keystore.KeyGenParameterSpec$Builder");
             const useKeyGen = Java.use("android.security.keystore.KeyGenParameterSpec$Builder");
             useKeyGen.$init.overload("java.lang.String", "int").implementation = function (keyStoreAlias, purpose) {
@@ -466,7 +466,7 @@ setTimeout(function() {
             }
         }
 
-        if (MODULES.IvParameterSpec) {
+        if (CRYPTO_MODULES.IvParameterSpec) {
             fusion_sendMessage('*', "Module attached: javax.crypto.spec.IvParameterSpec");
             const ivParameter = Java.use("javax.crypto.spec.IvParameterSpec");
             ivParameter.$init.overload("[B").implementation = function (ivKey) {
@@ -488,7 +488,7 @@ setTimeout(function() {
             }
         }
 
-        if (MODULES.GCMParameterSpec) {
+        if (CRYPTO_MODULES.GCMParameterSpec) {
             fusion_sendMessage('*', "Module attached: javax.crypto.spec.GCMParameterSpec");
             const gcmParameter = Java.use("javax.crypto.spec.GCMParameterSpec");
             gcmParameter.$init.overload("int", "[B").implementation = function (tLen, ivKey) {
@@ -512,7 +512,7 @@ setTimeout(function() {
             }
         }
 
-        if (MODULES.PBEParameterSpec) {
+        if (CRYPTO_MODULES.PBEParameterSpec) {
             fusion_sendMessage('*', "Module attached: javax.crypto.spec.PBEParameterSpec");
             const pbeParameter = Java.use("javax.crypto.spec.PBEParameterSpec");
             pbeParameter.$init.overload("[B", "int").implementation = function (salt, iterationCount) {
@@ -547,7 +547,7 @@ setTimeout(function() {
             }
         }
 
-        if (MODULES.X509EncodedKeySpec) {
+        if (CRYPTO_MODULES.X509EncodedKeySpec) {
             fusion_sendMessage('*', "Module attached: java.security.spec.X509EncodedKeySpec");
             const x509EncodedKeySpec = Java.use("java.security.spec.X509EncodedKeySpec");
             x509EncodedKeySpec.$init.overload("[B").implementation = function (encodedKey) {
