@@ -32,6 +32,7 @@ class Settings(ModuleBase):
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS [android_settings] (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    package TEXT NOT NULL,
                     module TEXT NULL,
                     name TEXT NULL,
                     flag INTEGER NULL DEFAULT (0),
@@ -49,12 +50,14 @@ class Settings(ModuleBase):
     def __init__(self):
         super().__init__('Settings', 'Hook Android Settings functions')
         self._settings_db = None
+        self._package = None
         self.mod_path = str(Path(__file__).resolve().parent)
 
     def start_module(self, **kwargs) -> bool:
         if 'db_path' not in kwargs:
             raise Exception("parameter db_path not found")
 
+        self._package = kwargs['package']
         self._settings_db = Settings.SettingsDB(db_name=kwargs['db_path'])
         return True
 
@@ -87,6 +90,7 @@ class Settings(ModuleBase):
 
             self._settings_db.insert_ignore_one(
                 table_name='android_settings',
+                package=self._package,
                 module=module,
                 name=name,
                 flag=flag,

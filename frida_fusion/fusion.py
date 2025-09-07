@@ -626,7 +626,10 @@ class Fusion(object):
             if len(self._modules) > 0:
                 Logger.pl("{+} Starting selected modules")
                 for m in self._modules:
-                    m.start_module(db_path=Configuration.db_path)
+                    m.start_module(
+                        package=Configuration.package,
+                        db_path=Configuration.db_path
+                    )
 
                 self._ignore_messages = [
                     Path(f).name

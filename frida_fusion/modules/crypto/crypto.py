@@ -32,6 +32,7 @@ class Crypto(ModuleBase):
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS [crypto] (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    package TEXT NOT NULL,
                     hashcode TEXT NOT NULL,
                     algorithm TEXT NULL,
                     init_key TEXT NULL,
@@ -52,6 +53,7 @@ class Crypto(ModuleBase):
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS [crypto_key] (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    package TEXT NOT NULL,
                     key TEXT NULL,
                     printable_key TEXT NULL,
                     salt TEXT NULL,
@@ -59,7 +61,7 @@ class Crypto(ModuleBase):
                     key_class TEXT NULL DEFAULT ('<unknown>'),
                     additional_data TEXT NULL,
                     created_date datetime not null DEFAULT (datetime('now','localtime')),
-                    UNIQUE (key, key_class)
+                    UNIQUE (package, key, key_class)
                 );
             """)
 
@@ -68,6 +70,7 @@ class Crypto(ModuleBase):
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS [digest] (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    package TEXT NOT NULL,
                     algorithm TEXT NOT NULL,
                     hashcode TEXT NULL,
                     clear_text TEXT NULL,
@@ -98,7 +101,7 @@ class Crypto(ModuleBase):
 
         def update_crypto(self, iv=None, hashcode=None, flow=None, key=None, before_final=None,
                           after_final=None, stack_trace=None, id=None, algorithm=None,
-                          status=None):
+                          status=None, package=None):
 
             conn = self.connect_to_db(check=False)
             cursor = conn.cursor()
@@ -124,6 +127,12 @@ class Crypto(ModuleBase):
 
                 data = []
                 update = "update [crypto] set "
+
+                if package is not None:
+                    integrity = True
+                    update += " package = ?,"
+                    data.append(package)
+
                 if iv is not None:
                     integrity = True
                     update += " iv = ?,"
@@ -213,7 +222,7 @@ class Crypto(ModuleBase):
 
             conn.close()
 
-        def insert_digest(self, hashcode, algorithm, data_input, data_output, stack_trace):
+        def insert_digest(self, package, hashcode, algorithm, data_input, data_output, stack_trace):
 
             conn = self.connect_to_db(check=False)
 
@@ -243,9 +252,9 @@ class Crypto(ModuleBase):
 
             cursor = conn.cursor()
             cursor.execute("""
-            insert into [digest] ([hashcode], [algorithm], [clear_text], [clear_text_b64], [hash_b64], [hash_hex], [stack_trace])
-            VALUES (?,?,?,?,?,?,?);
-            """, (hashcode, algorithm, clear_text, clear_text_b64, hash_b64, hash_hex, stack_trace,))
+            insert into [digest] ([package], [hashcode], [algorithm], [clear_text], [clear_text_b64], [hash_b64], [hash_hex], [stack_trace])
+            VALUES (?,?,?,?,?,?,?,?);
+            """, (package, hashcode, algorithm, clear_text, clear_text_b64, hash_b64, hash_hex, stack_trace,))
 
             conn.commit()
 
@@ -253,13 +262,14 @@ class Crypto(ModuleBase):
 
             # Color.pl('{+} {W}Inserindo crypto. {C}Algorithm: {O}%s{W}' % algorithm)
 
-        def insert_crypto(self, hashcode, algorithm, init_key):
+        def insert_crypto(self, package, hashcode, algorithm, init_key):
 
             if hashcode is None:
                 return
 
             rows = self.select(
                 table_name='crypto',
+                package=package,
                 hashcode=hashcode,
                 status='open'
             )
@@ -280,6 +290,7 @@ class Crypto(ModuleBase):
                 if init_key is not None and init_key != '' and init_key != 'IA==':
                     self.insert_one(
                         table_name='crypto',
+                        package=package,
                         hashcode=hashcode,
                         algorithm=algorithm,
                         init_key=init_key,
@@ -287,15 +298,17 @@ class Crypto(ModuleBase):
                 else:
                     self.insert_one(
                         table_name='crypto',
+                        package=package,
                         hashcode=hashcode,
                         algorithm=algorithm,
                         status='open')
 
-        def insert_crypto_key(self, key, key_class, salt=None,
+        def insert_crypto_key(self, package, key, key_class, salt=None,
                               iteration_count=0, module="<unknown>", additional_data=dict):
             if key is not None and key != '' and key != 'IA==':
                 self.insert_ignore_one(
                     table_name='crypto_key',
+                    package=package,
                     key=key,
                     printable_key=self.get_printable(key),
                     key_class=key_class,
@@ -309,6 +322,7 @@ class Crypto(ModuleBase):
 
     def __init__(self):
         super().__init__('Crypto', 'Hook cryptography/hashing functions')
+        self._package = None
         self._crypto_db = None
         self.mod_path = str(Path(__file__).resolve().parent)
 
@@ -316,6 +330,7 @@ class Crypto(ModuleBase):
         if 'db_path' not in kwargs:
             raise Exception("parameter db_path not found")
 
+        self._package = kwargs['package']
         self._crypto_db = Crypto.CryptoDB(db_name=kwargs['db_path'])
         return True
 
@@ -347,6 +362,7 @@ class Crypto(ModuleBase):
                 iteration_count = received_data.get('iteration_count', None)
 
             self._crypto_db.insert_crypto_key(
+                package=self._package,
                 key=key,
                 key_class=key_class,
                 salt=salt,
@@ -361,11 +377,13 @@ class Crypto(ModuleBase):
             hashcode = received_data.get('hashcode', None)
             key_class = received_data.get('classtype', "SecretKeySpec")
             self._crypto_db.insert_crypto(
+                package=self._package,
                 hashcode=hashcode,
                 algorithm=algorithm,
                 init_key=key)
 
             self._crypto_db.insert_crypto_key(
+                package=self._package,
                 key=key,
                 key_class=key_class,
                 module=module,
@@ -392,6 +410,7 @@ class Crypto(ModuleBase):
             self._crypto_db.update_crypto(iv=bData)
 
             self._crypto_db.insert_crypto_key(
+                package=self._package,
                 key=bData,
                 key_class=key_class,
                 module=module,
@@ -406,12 +425,14 @@ class Crypto(ModuleBase):
             algorithm = received_data.get('algorithm', None)
 
             self._crypto_db.insert_crypto(
+                package=self._package,
                 hashcode=hashcode,
                 algorithm=algorithm,
                 init_key=key
             )
 
             self._crypto_db.update_crypto(
+                package=self._package,
                 hashcode=hashcode,
                 flow='enc' if 'encrypt' in opmode else ('dec' if 'decrypt' in opmode else str(opmode)),
                 key=key,
@@ -419,6 +440,7 @@ class Crypto(ModuleBase):
             )
 
             self._crypto_db.insert_crypto_key(
+                package=self._package,
                 key=key,
                 key_class=key_class,
                 module=module,
@@ -435,12 +457,14 @@ class Crypto(ModuleBase):
             hashcode = received_data.get('hashcode', None)
 
             self._crypto_db.insert_crypto(
+                package=self._package,
                 hashcode=hashcode,
                 algorithm=None,
                 init_key=None
             )
 
             self._crypto_db.update_crypto(
+                package=self._package,
                 hashcode=hashcode,
                 before_final=received_data.get('input', ''),
                 after_final=received_data.get('output', ''),
@@ -458,14 +482,14 @@ class Crypto(ModuleBase):
             hashcode = received_data.get('hashcode', None)
             algorithm = received_data.get('algorithm', None)
             bInput = received_data.get('input', None)
-            self._crypto_db.insert_digest(hashcode, algorithm, bInput, None, stack_trace=stack_trace)
+            self._crypto_db.insert_digest(self._package, hashcode, algorithm, bInput, None, stack_trace=stack_trace)
 
         elif module == "messageDigest.digest":
             hashcode = received_data.get('hashcode', None)
             algorithm = received_data.get('algorithm', None)
             bInput = received_data.get('input', None)  # Se não existir teve um messageDigest.update antes
             bOutput = received_data.get('output', None)
-            self._crypto_db.insert_digest(hashcode, algorithm, bInput, bOutput, stack_trace=stack_trace)
+            self._crypto_db.insert_digest(self._package, hashcode, algorithm, bInput, bOutput, stack_trace=stack_trace)
 
             hash_hex = ""
             if bOutput is not None:
