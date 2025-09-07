@@ -375,7 +375,20 @@ class Crypto(ModuleBase):
         elif module == "IvParameterSpec.init":
             bData = received_data.get('iv_key', None)
             key_class = received_data.get('classtype', "IvParameterSpec")
-            # print("IV: %s" % bData)
+
+            offset = received_data.get('offset', None)
+            length = received_data.get('length', None)
+            if offset is not None and length is not None:
+                try:
+                    offset = int(offset)
+                    length = int(length)
+                    if isinstance(bData, str):
+                        bData = base64.b64decode(bData)
+                        if offset + length <= len(bData):
+                            bData = base64.b64encode(bData[offset:offset+length]).decode("UTF-8")
+                except:
+                    pass
+
             self._crypto_db.update_crypto(iv=bData)
 
             self._crypto_db.insert_crypto_key(
