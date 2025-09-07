@@ -22,6 +22,7 @@ class Configuration(object):
     base_path = str(Path(__file__).resolve().parent)
     db_path = os.path.join(str(Path(".").resolve()), "fusion.db")
     enabled_modules = {}
+    ignore_messages_modules = {}
 
     # Device vars
     device_id = None
@@ -180,9 +181,15 @@ class Configuration(object):
 
         Logger.pl('     {C}min debug level:{O} %s{W}' % str(args.debug_level).upper())
 
-        if args.enabled_modules is not None and isinstance(args.enabled_modules, list):
+        if (args.enabled_modules is not None and isinstance(args.enabled_modules, list)) or \
+                (args.ignore_messages_modules is not None and isinstance(args.ignore_messages_modules, list)):
             mods = ModuleManager.list_modules()
-            for mod in args.enabled_modules:
+            for mod in [
+                m.strip()
+                for md in args.enabled_modules
+                for m in md.split(",")
+                if m.strip() != ""
+            ]:
                 fm = next(iter([
                     m
                     for _, m in mods.items()
@@ -197,10 +204,36 @@ class Configuration(object):
                 if name not in Configuration.enabled_modules.keys():
                     Configuration.enabled_modules[name] = fm
 
+            for mod in [
+                m.strip()
+                for md in args.ignore_messages_modules
+                for m in md.split(",")
+                if m.strip() != ""
+            ]:
+                fm = next(iter([
+                    m
+                    for _, m in mods.items()
+                    if m.safe_name() == mod.lower()
+                ]), None)
+                if fm is None:
+                    Color.pl(
+                        '{!} {R}error: module {O}%s{R} not found{W}\r\n' % mod)
+                    sys.exit(1)
+
+                name = fm.safe_name()
+                if name not in Configuration.ignore_messages_modules.keys():
+                    Configuration.ignore_messages_modules[name] = fm
+
         if len(Configuration.enabled_modules) > 0:
             Logger.pl('     {C}modules:{O} %s{W}' % ', '.join([
                 m.name
                 for _, m in Configuration.enabled_modules.items()
+            ]))
+
+        if len(Configuration.ignore_messages_modules) > 0:
+            Logger.pl('     {C}ignored messages from modules:{O} %s{W}' % ', '.join([
+                m.name
+                for _, m in Configuration.ignore_messages_modules.items()
             ]))
 
         Logger.pl("")

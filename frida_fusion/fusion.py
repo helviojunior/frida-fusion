@@ -44,6 +44,7 @@ class Fusion(object):
         self.pid = 0
         self.script_trace = {}
         self._modules = []
+        self._ignore_messages = []
         signal.signal(signal.SIGINT, self.signal_handler)
 
         t = threading.Thread(target=Fusion._db_worker, daemon=True)
@@ -293,6 +294,10 @@ class Fusion(object):
                     mType = jData.get('type', '').lower()
                     mLevel = jData.get('level', None)
                     if mType == "message":
+
+                        if script_location.file_name in self._ignore_messages:
+                            return
+
                         msg = jData.get('message', '')
                         try:
                             msg = base64.b64decode(msg).decode("UTF-8")
@@ -622,6 +627,17 @@ class Fusion(object):
                 Logger.pl("{+} Starting selected modules")
                 for m in self._modules:
                     m.start_module(db_path=Configuration.db_path)
+
+                self._ignore_messages = [
+                    Path(f).name
+                    for _, md in Configuration.ignore_messages_modules.items()
+                    if (m := next(iter([
+                        mi
+                        for mi in self._modules
+                        if mi.name == md.name
+                    ]), None)) is not None
+                    for f in m.js_files()
+                ]
 
             self.get_device()
             if self.device is not None:

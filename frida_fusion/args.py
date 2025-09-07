@@ -148,4 +148,8 @@ class Arguments(object):
                              dest='enabled_modules',
                              help='Enabled module by name. You can specify multiple values repeating the flag.')
 
+        modules.add_argument('--silence-module-messages',
+                             action='append',
+                             dest='ignore_messages_modules',
+                             help='Silence messages becaming from module by name. You can specify multiple values repeating the flag.')
 
