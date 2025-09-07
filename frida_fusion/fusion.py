@@ -194,9 +194,29 @@ class Fusion(object):
             s.on("message", self.make_handler("fusion_bundle.js"))  # register the message handler
             s.load()
         except Exception as e:
-            Logger.pl('{!} {R}Error:{O} %s{W}' % str(e))
-            print("")
-            sys.exit(1)
+
+            try:
+                err = str(e)
+                pattern = re.compile(r'script\(line (\d+)\):')
+                matches = [
+                    (
+                        m.group(0),
+                        self.translate_location(dict(
+                            file_name="fusion_bundle.js",
+                            line=m.group(1),
+                        ))
+                    )
+                    for m in pattern.finditer(err)
+                ]
+                for m in matches:
+                    err = err.replace(m[0], f"{m[1].file_name}(line {m[1].line})")
+                Logger.pl('{!} {R}Error:{O} %s{W}' % err)
+                print("")
+                sys.exit(1)
+            except Exception:
+                Logger.pl('{!} {R}Error:{O} %s{W}' % str(e))
+                print("")
+                sys.exit(1)
 
     def attach(self, pid: int):
         self.running = True
