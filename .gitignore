@@ -26,6 +26,7 @@
 
 # Logs and databases #
 ######################
+*.txt
 *.log
 *.sqlite
 *.db
