@@ -7,12 +7,11 @@ https://developer.android.com/reference/android/provider/Settings
 const SET_MODULES = {
     Global: true,
     Secure: true,
+    System: true,
 };
 
 setTimeout(function() {
     Java.perform(function() {
-
-        const System = Java.use("java.lang.System");
 
         // Bypass Settings
         var androidSettings = [
@@ -33,6 +32,59 @@ setTimeout(function() {
                 }
             });
             return originalValue;
+        }
+
+        if (SET_MODULES.System) {
+
+            fusion_sendMessage('D', "Module attached: android.provider.Settings.System");
+            const settingsSystem = Java.use("android.provider.Settings$System");
+
+            settingsSystem.getString.overload('android.content.ContentResolver', 'java.lang.String').implementation = function (cr, name) {
+                var data = this.getString.overload('android.content.ContentResolver', 'java.lang.String').call(this, cr, name);
+                fusion_sendKeyValueData("Settings$System.getString", [
+                    {key: "Name", value: name},
+                    {key: "Result", value: data}
+                ]);
+                return data
+            };
+
+            settingsSystem.putString.overload('android.content.ContentResolver', 'java.lang.String', 'java.lang.String').implementation = function (cr, name, value) {
+                fusion_sendKeyValueData("Settings$System.putString", [
+                    {key: "Name", value: name},
+                    {key: "Value", value: value}
+                ]);
+                return this.putString.overload('android.content.ContentResolver', 'java.lang.String', 'java.lang.String').call(this, cr, name, value);
+            };
+
+            settingsSystem.getUriFor.overload('java.lang.String').implementation = function (name) {
+                var data = this.getUriFor.overload('java.lang.String').call(this, name);
+                fusion_sendKeyValueData("Settings$System.getUriFor", [
+                    {key: "Name", value: name},
+                    {key: "Result", value: data}
+                ]);
+                return data
+            };
+
+            settingsSystem.getInt.overload('android.content.ContentResolver', 'java.lang.String', 'int').implementation = function(cr, name, flag) {
+                var data = this.getInt.overload('android.content.ContentResolver', 'java.lang.String', 'int').call(this, cr, name, flag);
+                fusion_sendKeyValueData("Settings$System.getInt", [
+                    {key: "Name", value: name},
+                    {key: "Flag", value: flag},
+                    {key: "Result", value: data}
+                ]);
+
+                return settings_bypassValue(name, data);
+            }
+
+            settingsSystem.getInt.overload('android.content.ContentResolver', 'java.lang.String').implementation = function(cr, name) {
+                var data = this.getInt.overload('android.content.ContentResolver', 'java.lang.String').call(this, cr, name);
+                fusion_sendKeyValueData("Settings$System.getInt", [
+                    {key: "Name", value: name},
+                    {key: "Result", value: data}
+                ]);
+                return settings_bypassValue(name, data);
+            }
+
         }
 
         if (SET_MODULES.Secure) {
