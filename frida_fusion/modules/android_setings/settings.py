@@ -74,6 +74,10 @@ class Settings(ModuleBase):
                       "Settings$Secure.putString",
                       "Settings$Secure.getUriFor",
                       "Settings$Secure.getInt",
+                      "Settings$System.getString",
+                      "Settings$System.putString",
+                      "Settings$System.getUriFor",
+                      "Settings$System.getInt",
                       "Settings$Global.getInt"
                       ]:
             name = received_data.get('name', None)
