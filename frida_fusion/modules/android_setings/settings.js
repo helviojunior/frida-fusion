@@ -27,7 +27,7 @@ setTimeout(function() {
                 let value = item[1];
 
                 if (name === name) {
-                    fusion_sendMessage('D', `Bypassing android settings checking ${name}`)
+                    fusion_sendMessage('D', `Bypassing android settings checking: ${name}`)
                     return value;
                 }
             });
