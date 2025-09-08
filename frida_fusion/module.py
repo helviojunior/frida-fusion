@@ -8,13 +8,9 @@ import requests
 import importlib.util
 from pathlib import Path
 
-from typing import TYPE_CHECKING
-
 from .__meta__ import __version__
 from .libs.logger import Logger
-
-if TYPE_CHECKING:
-    from .fusion import Fusion  # só no type checker
+from .libs.scriptlocation import ScriptLocation
 
 
 class ModuleLoaderError(Exception):
@@ -42,11 +38,11 @@ class ModuleBase(object):
     def js_files(self) -> list:
         return []
 
-    def supres_messages(self):
+    def suppress_messages(self):
         pass
 
     def key_value_event(self,
-                        script_location: "Fusion.ScriptLocation" = None,
+                        script_location: ScriptLocation = None,
                         stack_trace: str = None,
                         module: str = None,
                         received_data: dict = None
@@ -54,7 +50,7 @@ class ModuleBase(object):
         raise Exception('Method "key_value_event" is not yet implemented.')
 
     def data_event(self,
-                   script_location: "Fusion.ScriptLocation" = None,
+                   script_location: ScriptLocation = None,
                    stack_trace: str = None,
                    received_data: str = None
                    ) -> bool:

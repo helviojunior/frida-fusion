@@ -324,7 +324,7 @@ class Crypto(ModuleBase):
         super().__init__('Crypto', 'Hook cryptography/hashing functions')
         self._package = None
         self._crypto_db = None
-        self._supres_messages = False
+        self._suppress_messages = False
         self.mod_path = str(Path(__file__).resolve().parent)
 
     def start_module(self, **kwargs) -> bool:
@@ -340,8 +340,8 @@ class Crypto(ModuleBase):
             os.path.join(self.mod_path, "crypto.js")
         ]
 
-    def supres_messages(self):
-        self._supres_messages = True
+    def suppress_messages(self):
+        self._suppress_messages = True
 
     def key_value_event(self,
                         script_location: ScriptLocation = None,
@@ -451,7 +451,7 @@ class Crypto(ModuleBase):
                 additional_data=received_data
             )
 
-            if not self._supres_messages:
+            if not self._suppress_messages:
                 Logger.print_message(
                     level="W",
                     message=f"Cipher init received\nHashcode: {hashcode}\nOpmode: {opmode}\nKeytype: {key_class}",
@@ -477,7 +477,7 @@ class Crypto(ModuleBase):
                 status="complete"
             )
 
-            if not self._supres_messages:
+            if not self._suppress_messages:
                 Logger.print_message(
                     level="D",
                     message=f"Cipher doFinal received\n{stack_trace}",
@@ -508,7 +508,7 @@ class Crypto(ModuleBase):
                     pass
 
             # Do not print TLS certificate verification hash
-            if not self._supres_messages:
+            if not self._suppress_messages:
                 if 'com.android.org.conscrypt.ConscryptEngine.verifyCertificateChain' not in stack_trace:
                     Logger.print_message(
                         level="D",
