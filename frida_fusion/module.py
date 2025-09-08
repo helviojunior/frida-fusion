@@ -38,6 +38,9 @@ class ModuleBase(object):
     def js_files(self) -> list:
         return []
 
+    def dynamic_script(self) -> str:
+        return ""
+
     def suppress_messages(self):
         pass
 

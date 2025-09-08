@@ -2,6 +2,7 @@
 # -*- coding: UTF-8 -*-
 from __future__ import annotations
 
+from .exceptions import SilentKillError
 from .libs.color import Color
 from .libs.scriptlocation import ScriptLocation
 
@@ -64,10 +65,12 @@ class Fusion(object):
         try:
             self.session.detach()
         except:
-            try:
-                self.device.kill(self.pid)
-            except:
-                pass
+            pass
+
+        try:
+            self.device.kill(self.pid)
+        except:
+            pass
 
     def get_device(self):
         try:
@@ -150,6 +153,13 @@ class Fusion(object):
 
         for m in self._modules:
             files_js += m.js_files()
+            dyn = m.dynamic_script()
+            if dyn is not None and dyn.strip(" \r\n") != "":
+                dyn += "\n\n"
+                line_cnt = len(dyn.split("\n")) - 1
+                self.script_trace[f"dyn_{m.safe_name()}.js"] = (offset, offset + line_cnt)
+                offset += line_cnt
+                src += dyn
 
         if os.path.isfile(Configuration.frida_scripts):
             files_js += [Configuration.frida_scripts]
@@ -220,8 +230,15 @@ class Fusion(object):
                 sys.exit(1)
 
     def attach(self, pid: int):
-        self.running = True
+        Fusion.running = True
         self.pid = pid
+
+        if self.session is not None:
+            try:
+                self.session.off("detached", self.on_detached)
+            except:
+                pass
+            self.session = None
 
         self.session = self.device.attach(self.pid)
         self.session.on("detached", self.on_detached)
@@ -231,9 +248,17 @@ class Fusion(object):
         self.device.resume(self.pid)
 
     def std_spawn(self):
-        self.running = True
+        Fusion.running = True
+
+        if self.session is not None:
+            try:
+                self.session.off("detached", self.on_detached)
+            except:
+                pass
+            self.session = None
 
         self.pid = self.device.spawn([Configuration.package])
+        print(self.pid)
         self.session = self.device.attach(self.pid)
         self.session.on("detached", self.on_detached)
 
@@ -242,7 +267,14 @@ class Fusion(object):
         self.device.resume(self.pid)
 
     def wait_spawn(self):
-        self.running = True
+        Fusion.running = True
+
+        if self.session is not None:
+            try:
+                self.session.off("detached", self.on_detached)
+            except:
+                pass
+            self.session = None
 
         self.pid = self.device.spawn([Configuration.package])
         self.device.resume(self.pid)
@@ -365,6 +397,18 @@ class Fusion(object):
                     else:
                         self.print_message(mLevel, message, script_location=script_location)
 
+                except SilentKillError as sk:
+                    skm = str(sk)
+
+                    self.print_message("D", "Silent kill requested",
+                                       script_location=Logger.get_caller_info(stack_index=1))
+                    Fusion.running = False
+                    time.sleep(0.2)
+                    if skm != "":
+                        Logger.pl(f'\n{skm}')
+                    Logger.pl('\n{+} {O}Exiting...{O}{W}')
+                    self.done.set()
+
                 except Exception as err:
                     script_location = ScriptLocation(file_name=Fusion._script_name)
                     self.print_message("E", message, script_location=script_location)
@@ -436,6 +480,7 @@ class Fusion(object):
         elif crash is not None:
             Logger.pl("[CRASH] details: " + str(crash))
 
+        Logger.pl("")
         self.done.set()
 
     def _raise_key_value_event(self,
@@ -451,6 +496,8 @@ class Fusion(object):
                     module=module,
                     received_data=received_data
                 )
+            except SilentKillError as ske:
+                raise ske
             except Exception as e:
                 if Configuration.debug_level >= 2:
                     self.print_message("E", f"Error resizing event to module {m.name}: {str(e)}")
@@ -468,6 +515,8 @@ class Fusion(object):
                     stack_trace=stack_trace,
                     received_data=received_data
                 )
+            except SilentKillError as ske:
+                raise ske
             except Exception as e:
                 if Configuration.debug_level >= 2:
                     self.print_message("E", f"Error resizing event to module {m.name}: {str(e)}")

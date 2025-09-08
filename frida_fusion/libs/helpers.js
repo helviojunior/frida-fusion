@@ -2,12 +2,24 @@
     Author: Helvio Junior - M4v3r1ck
 */
 
+function fusion_rawSend(payload1){
+    send(payload1);
+}
+
 function fusion_Send(payload1, payload2){
     const info = fusion_getCallerInfo();
-    send({
-      payload: payload1,
-      location: info
-    }, payload2);
+
+    const message = {
+        payload: payload1,
+        location: info
+    };
+
+    // if payload1 is objet and has "type"
+    if (payload1 && typeof payload1 === 'object' && 'type' in payload1) {
+        message.type = payload1.type;
+    }
+
+    send(message, payload2);
 }
 
 function fusion_waitForClass(name, onReady) {
@@ -78,6 +90,12 @@ function fusion_bytesToBase64(byteArray){
         fusion_sendMessage("W", err)
         return "IA==";
     }
+}
+
+function fusion_normalizePtr(addr) {
+  let p = ptr(addr);
+  if (Process.arch === 'arm64') p = p.and('0x00FFFFFFFFFFFFFF'); // limpa TBI
+  return p;
 }
 
 function fusion_getCallerInfo() {
@@ -243,6 +261,38 @@ function fusion_getClassName(obj)
     }
 
 }
+
+function fusion_getReadableRange(p) {
+  try { p = ptr(p); } catch (_) { return null; }
+  const range = Process.findRangeByAddress(p); // não lança exceção
+  if (!range) return null;
+  // range.protection exemplo: 'r-x', 'rw-'
+  return range.protection.indexOf('r') !== -1 ? range : null;
+}
+
+function fusion_isAddressReadable(p) {
+  const r = fusion_getReadableRange(p);
+  if (!r) return false;
+  // tenta ler 1 byte para confirmar acessibilidade
+  try { Memory.readU8(ptr(p)); return true; }
+  catch (_) { return false; }
+}
+
+function fusion_describeAddress(p) {
+  try { p = ptr(p); } catch (_) { return { ok:false, reason:'not a pointer' }; }
+  if (Process.arch === 'arm64') p = p.and('0x00FFFFFFFFFFFFFF'); // remove top byte
+  if (!fusion_isAddressReadable(p)) return { ok:false, reason:'invalid pointer' };
+  const range = Process.findRangeByAddress(p);
+  if (!range) return { ok:false, reason:'unmapped' };
+  return {
+    ok: true,
+    base: range.base,
+    size: range.size,
+    protection: range.protection,
+    file: range.file ? range.file.path : null
+  };
+}
+
 
 Java.perform(function () {
   const Thread = Java.use('java.lang.Thread');
