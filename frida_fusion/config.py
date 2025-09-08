@@ -203,26 +203,26 @@ class Configuration(object):
                 name = fm.safe_name()
                 if name not in Configuration.enabled_modules.keys():
                     Configuration.enabled_modules[name] = fm
+            if args.ignore_messages_modules is not None and isinstance(args.ignore_messages_modules, list):
+                for mod in [
+                    m.strip()
+                    for md in args.ignore_messages_modules
+                    for m in md.split(",")
+                    if m.strip() != ""
+                ]:
+                    fm = next(iter([
+                        m
+                        for _, m in mods.items()
+                        if m.safe_name() == mod.lower()
+                    ]), None)
+                    if fm is None:
+                        Color.pl(
+                            '{!} {R}error: module {O}%s{R} not found{W}\r\n' % mod)
+                        sys.exit(1)
 
-            for mod in [
-                m.strip()
-                for md in args.ignore_messages_modules
-                for m in md.split(",")
-                if m.strip() != ""
-            ]:
-                fm = next(iter([
-                    m
-                    for _, m in mods.items()
-                    if m.safe_name() == mod.lower()
-                ]), None)
-                if fm is None:
-                    Color.pl(
-                        '{!} {R}error: module {O}%s{R} not found{W}\r\n' % mod)
-                    sys.exit(1)
-
-                name = fm.safe_name()
-                if name not in Configuration.ignore_messages_modules.keys():
-                    Configuration.ignore_messages_modules[name] = fm
+                    name = fm.safe_name()
+                    if name not in Configuration.ignore_messages_modules.keys():
+                        Configuration.ignore_messages_modules[name] = fm
 
         if len(Configuration.enabled_modules) > 0:
             Logger.pl('     {C}modules:{O} %s{W}' % ', '.join([
