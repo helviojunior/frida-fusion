@@ -630,6 +630,8 @@ class Fusion(object):
                         package=Configuration.package,
                         db_path=Configuration.db_path
                     )
+                    if m.safe_name() in Configuration.ignore_messages_modules.keys():
+                        m.supres_messages()
 
                 self._ignore_messages = [
                     Path(f).name

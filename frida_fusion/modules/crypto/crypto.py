@@ -324,6 +324,7 @@ class Crypto(ModuleBase):
         super().__init__('Crypto', 'Hook cryptography/hashing functions')
         self._package = None
         self._crypto_db = None
+        self._supres_messages = False
         self.mod_path = str(Path(__file__).resolve().parent)
 
     def start_module(self, **kwargs) -> bool:
@@ -338,6 +339,9 @@ class Crypto(ModuleBase):
         return [
             os.path.join(self.mod_path, "crypto.js")
         ]
+
+    def supres_messages(self):
+        self._supres_messages = True
 
     def key_value_event(self,
                         script_location: ScriptLocation = None,
@@ -447,11 +451,12 @@ class Crypto(ModuleBase):
                 additional_data=received_data
             )
 
-            Logger.print_message(
-                level="W",
-                message=f"Cipher init received\nHashcode: {hashcode}\nOpmode: {opmode}\nKeytype: {key_class}",
-                script_location=script_location
-            )
+            if not self._supres_messages:
+                Logger.print_message(
+                    level="W",
+                    message=f"Cipher init received\nHashcode: {hashcode}\nOpmode: {opmode}\nKeytype: {key_class}",
+                    script_location=script_location
+                )
 
         elif module == "cipher.doFinal":
             hashcode = received_data.get('hashcode', None)
@@ -472,11 +477,12 @@ class Crypto(ModuleBase):
                 status="complete"
             )
 
-            Logger.print_message(
-                level="D",
-                message=f"Cipher doFinal received\n{stack_trace}",
-                script_location=script_location
-            )
+            if not self._supres_messages:
+                Logger.print_message(
+                    level="D",
+                    message=f"Cipher doFinal received\n{stack_trace}",
+                    script_location=script_location
+                )
 
         elif module == "messageDigest.update":
             hashcode = received_data.get('hashcode', None)
@@ -502,12 +508,13 @@ class Crypto(ModuleBase):
                     pass
 
             # Do not print TLS certificate verification hash
-            if 'com.android.org.conscrypt.ConscryptEngine.verifyCertificateChain' not in stack_trace:
-                Logger.print_message(
-                    level="D",
-                    message=f"Message digest\nAlgorithm: {algorithm}\nHash: {hash_hex}\n{stack_trace}",
-                    script_location=script_location
-                )
+            if not self._supres_messages:
+                if 'com.android.org.conscrypt.ConscryptEngine.verifyCertificateChain' not in stack_trace:
+                    Logger.print_message(
+                        level="D",
+                        message=f"Message digest\nAlgorithm: {algorithm}\nHash: {hash_hex}\n{stack_trace}",
+                        script_location=script_location
+                    )
 
         return True
 

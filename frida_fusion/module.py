@@ -42,6 +42,9 @@ class ModuleBase(object):
     def js_files(self) -> list:
         return []
 
+    def supres_messages(self):
+        pass
+
     def key_value_event(self,
                         script_location: "Fusion.ScriptLocation" = None,
                         stack_trace: str = None,
