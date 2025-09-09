@@ -60,7 +60,13 @@ class Arguments(object):
                             action='append',
                             dest='enabled_modules')
 
-        t_args, _ = parser.parse_known_args()
+        t_args, _ = parser.parse_known_args([
+            word
+            for word in sys.argv
+            if word != "-h" and word != "--list-modules"
+        ])
+        if t_args is None or t_args.enabled_modules is None:
+            return []
         return [
             m
             for md in t_args.enabled_modules
