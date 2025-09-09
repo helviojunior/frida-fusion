@@ -1,6 +1,8 @@
 import os
 import sys
 import re
+from argparse import _ArgumentGroup, Namespace
+
 import frida
 import pkgutil
 import importlib
@@ -35,6 +37,9 @@ class ModuleBase(object):
     def start_module(self, **kwargs) -> bool:
         raise Exception('Method "start_module" is not yet implemented.')
 
+    def load_from_arguments(self, args: Namespace) -> bool:
+        return True
+
     def js_files(self) -> list:
         return []
 
@@ -42,6 +47,9 @@ class ModuleBase(object):
         return ""
 
     def suppress_messages(self):
+        pass
+
+    def add_params(self, flags: _ArgumentGroup):
         pass
 
     def key_value_event(self,
@@ -128,6 +136,9 @@ class ExternalModule(Module):
 
 
 class ModuleManager:
+    initialized = False  # Flag indicating modules has been initialized
+    modules: dict[str, Module] = {}
+
     @classmethod
     def _safe_import_from_path(cls, path: Path, loaded_files: set):
         """
@@ -191,9 +202,12 @@ class ModuleManager:
 
     @classmethod
     def list_modules(cls) -> dict:
+        if ModuleManager.initialized:
+            return ModuleManager.modules
+
         try:
             base_module = Module.get_base_module()
-            modules: dict[str, Module] = {}
+            ModuleManager.modules = {}
 
             # --- 1) Varredura padrão do seu pacote interno: <este_arquivo>/modules ---
             base_path = Path(__file__).resolve().parent / "modules"
@@ -245,13 +259,13 @@ class ModuleManager:
             for i_class in ModuleBase.__subclasses__():
                 t = i_class()
                 key = t.safe_name()
-                if key in modules:
+                if key in ModuleManager.modules:
                     raise ModuleLoaderError(
                         f"Duplicated Module name: {i_class.__module__}.{i_class.__qualname__}"
                     )
 
                 if str(i_class.__module__) in internal_mods:
-                    modules[key] = InternalModule(
+                    ModuleManager.modules[key] = InternalModule(
                         name=t.name,
                         description=t.description,
                         module=str(i_class.__module__),
@@ -259,7 +273,7 @@ class ModuleManager:
                         class_name=i_class,
                     )
                 else:
-                    modules[key] = ExternalModule(
+                    ModuleManager.modules[key] = ExternalModule(
                         name=t.name,
                         description=t.description,
                         module=str(i_class.__module__),
@@ -267,7 +281,8 @@ class ModuleManager:
                         class_name=i_class,
                     )
 
-            return modules
+            ModuleManager.initialized = True
+            return ModuleManager.modules
 
         except Exception as e:
             # Envolve a exceção original para manter contexto

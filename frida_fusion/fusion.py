@@ -258,7 +258,6 @@ class Fusion(object):
             self.session = None
 
         self.pid = self.device.spawn([Configuration.package])
-        print(self.pid)
         self.session = self.device.attach(self.pid)
         self.session.on("detached", self.on_detached)
 
@@ -675,6 +674,7 @@ class Fusion(object):
             if len(self._modules) > 0:
                 Logger.pl("{+} Starting selected modules")
                 for m in self._modules:
+                    m.load_from_arguments(Configuration.args)
                     m.start_module(
                         package=Configuration.package,
                         db_path=Configuration.db_path

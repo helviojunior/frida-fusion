@@ -4,6 +4,7 @@ import os
 import errno
 import sys
 import signal
+from argparse import Namespace
 from pathlib import Path
 
 from .module import Module, ModuleManager, InternalModule, ExternalModule
@@ -17,6 +18,7 @@ class Configuration(object):
     version = '0.0.0'
 
     initialized = False  # Flag indicating config has been initialized
+    args: Namespace = {}
     debug_level = 0
     cmd_line = ''
     base_path = str(Path(__file__).resolve().parent)
@@ -98,6 +100,7 @@ class Configuration(object):
             sys.exit(0)
 
         args = Arguments().args
+        Configuration.args = args
 
         Color.pl('{+} {W}Startup parameters')
 

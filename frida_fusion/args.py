@@ -6,6 +6,8 @@ import sys
 
 from .libs.color import Color
 from .__meta__ import __description__
+from .module import ModuleManager
+
 
 class Arguments(object):
     ''' Holds arguments used by the Frida Fusion '''
@@ -43,7 +45,30 @@ class Arguments(object):
         modules_group = parser.add_argument_group('Modules')
         self._add_modules_args(modules_group)
 
+        # Add module args
+        for mod in self._get_requested_module_list():
+            flags = parser.add_argument_group(f'{mod.name} Flags')
+            mod.create_instance().add_params(flags)
+
         return parser.parse_args()
+
+    def _get_requested_module_list(self):
+        mods = ModuleManager.list_modules()
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-m',
+                            '--module',
+                            action='append',
+                            dest='enabled_modules')
+
+        t_args, _ = parser.parse_known_args()
+        return [
+            m
+            for md in t_args.enabled_modules
+            for mn in md.split(",")
+            if mn.strip() != ""
+            for _, m in mods.items()
+            if m.safe_name() == mn.lower()
+        ]
 
     def _add_app_args(self, app):
         app.add_argument('-f',
