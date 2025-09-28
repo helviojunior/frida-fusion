@@ -145,7 +145,7 @@ function fusion_sendKeyValueData(module, items) {
         stack_trace: st
       }, null);
     } catch (err) {
-      fusion_sendMessage("W", err)
+      fusion_sendMessage("W", `Error: ${err}`)
     }
     return null;
 }
@@ -164,7 +164,7 @@ function fusion_sendMessage(level, message){
           message: b64Msg
         }, null)
     } catch (err) {
-        fusion_sendMessage("W", err)
+        fusion_sendMessage("W", `Error: ${err}`)
     }
 }
 
@@ -188,7 +188,7 @@ function fusion_sendMessageWithTrace(level, message){
           message: b64Msg
         }, null)
     } catch (err) {
-        fusion_sendMessage("W", err)
+        fusion_sendMessage("W", `Error: ${err}`)
     }
 }
 
@@ -222,7 +222,7 @@ function fusion_getB64StackTrace(){
         return b64Msg
 
     } catch (err) {
-        fusion_sendMessage("W", err);
+        fusion_sendMessage("W", `Error: ${err}`)
         return '';
     }
 }
@@ -260,11 +260,31 @@ function fusion_getClassName(obj)
         // Se for algo não Java, apenas retorna tipo do JS
         return typeof obj;
     } catch (err) {
-        fusion_sendMessage("W", err);
+        fusion_sendMessage("W", `Error: ${err}`)
         return '';
     }
 
 }
+
+function fusion_getFieldValue(obj, fieldName) {
+  if (obj === null || obj === undefined) return "";
+  try {
+    var cls = obj.getClass();
+    while (cls != null) {
+      try {
+        var f = cls.getDeclaredField(fieldName);
+        f.setAccessible(true);
+        return f.get(obj);
+      } catch (e) {
+        cls = cls.getSuperclass();
+      }
+    }
+  } catch (err) {
+      fusion_sendMessage("W", `Error: ${err}`)
+      return '';
+  }
+}
+
 
 function fusion_getReadableRange(p) {
   try { p = ptr(p); } catch (_) { return null; }

@@ -66,6 +66,9 @@ void    fusion_printStackTrace();
 # Print all methods of class 'name'
 void    fusion_printMethods(String name);
 
+# Get value of a field inside an class instance
+Object fusion_getFieldValue(Object obj, String fieldName);
+
 # Wait until the class 'name' exists in memory to execute the callback function
 void    fusion_waitForClass(String name, CallbackFunction onReady)
 

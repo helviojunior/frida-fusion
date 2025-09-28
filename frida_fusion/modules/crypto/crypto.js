@@ -3,7 +3,8 @@ const CRYPTO_MODULES = {
     KeyGenerator: true,
     KeyPairGenerator: true,
     SecretKeySpec: true,
-    MessageDigest: true,
+    MessageDigest: false,
+    KeyFactory: true,
     SecretKeyFactory: true,
     Signature: true,
     Cipher: true,
@@ -12,7 +13,7 @@ const CRYPTO_MODULES = {
     IvParameterSpec: true,
     GCMParameterSpec: true,
     PBEParameterSpec: true,
-    X509EncodedKeySpec: true
+    X509EncodedKeySpec: true,
 };
 
 setTimeout(function() {
@@ -142,6 +143,53 @@ setTimeout(function() {
                 return output;
             };
 
+        }
+
+        if (CRYPTO_MODULES.KeyFactory) {
+            fusion_sendMessage('*', "Module attached: java.security.KeyFactory");
+            const keyFactory = Java.use("java.security.KeyFactory");
+            keyFactory.getInstance.overload("java.lang.String").implementation = function (arg0) {
+                fusion_sendKeyValueData("KeyFactory.getInstance", [
+                    {key: "Algorithm", value: arg0}
+                ]);
+                return this.getInstance(arg0);
+            };
+
+            keyFactory.getInstance.overload("java.lang.String", "java.lang.String").implementation = function (arg0, arg1) {
+                fusion_sendKeyValueData("KeyFactory.getInstance", [
+                    {key: "Algorithm", value: arg0},
+                    {key: "Provider", value: arg1}
+                ]);
+                return this.getInstance(arg0, arg1);
+            };
+
+            keyFactory.getInstance.overload("java.lang.String", "java.security.Provider").implementation = function (arg0, arg1) {
+                fusion_sendKeyValueData("KeyFactory.getInstance", [
+                    {key: "Algorithm", value: arg0},
+                    {key: "Provider", value: arg1}
+                ]);
+                return this.getInstance(arg0, arg1);
+            };
+
+
+            keyFactory.generatePrivate.overload('java.security.spec.KeySpec').implementation = function (keySpec) {
+                fusion_sendKeyValueData("KeyFactory.generatePrivate", [
+                    {key: "ClassType", value: fusion_getClassName(this)},
+                    {key: "KeySpecClassType", value: fusion_getClassName(keySpec)},
+                    {key: "Algorithm", value: this.getAlgorithm()},
+                    {key: "Key", value: fusion_keyToBase64(keySpec)},
+                ]);
+                return this.generatePrivate(keySpec);
+            };
+
+            keyFactory.generatePublic.overload('java.security.spec.KeySpec').implementation = function (keySpec) {
+                fusion_sendKeyValueData("KeyFactory.generatePublic", [
+                    {key: "ClassType", value: fusion_getClassName(this)},
+                    {key: "KeySpecClassType", value: fusion_getClassName(keySpec)},
+                    {key: "Algorithm", value: this.getAlgorithm()},
+                ]);
+                return this.generatePublic(keySpec);
+            };
         }
 
         if (CRYPTO_MODULES.SecretKeyFactory) {
@@ -281,26 +329,73 @@ setTimeout(function() {
             }
 
             cipher.getInstance.overload("java.lang.String").implementation = function (arg0) {
-                fusion_sendKeyValueData("cipher.getInstance", [
+
+                var data = [
                     {key: "Algorithm", value: arg0}
-                ]);
-                return this.getInstance(arg0);
+                ];
+
+                var instance = this.getInstance(arg0);
+                try{
+                    data = data.concat([
+                        {key: "HashCode", value: instance.hashCode().toString()},
+                    ]);
+                    data = data.concat([
+                        {key: "Algorithm", value: instance.getAlgorithm()}
+                    ]);
+                } catch (err1) {
+                    fusion_sendError(err1)
+                }
+
+                fusion_sendKeyValueData("cipher.getInstance", data);
+                return instance;
             };
 
             cipher.getInstance.overload("java.lang.String", "java.lang.String").implementation = function (arg0, arg1) {
-                fusion_sendKeyValueData("cipher.getInstance", [
+
+                var data = [
                     {key: "Algorithm", value: arg0},
                     {key: "Provider", value: arg1}
-                ]);
-                return this.getInstance(arg0, arg1);
+                ];
+
+                var instance = this.getInstance(arg0, arg1);
+                try{
+                    data = data.concat([
+                        {key: "HashCode", value: instance.hashCode().toString()},
+                    ]);
+                    data = data.concat([
+                        {key: "Algorithm", value: instance.getAlgorithm()}
+                    ]);
+                } catch (err1) {
+                    fusion_sendError(err1)
+                }
+
+                fusion_sendKeyValueData("cipher.getInstance", data);
+                return instance;
+
             };
 
             cipher.getInstance.overload("java.lang.String", "java.security.Provider").implementation = function (arg0, arg1) {
-                fusion_sendKeyValueData("cipher.getInstance", [
+                
+                var data = [
                     {key: "Algorithm", value: arg0},
                     {key: "Provider", value: arg1}
-                ]);
-                return this.getInstance(arg0, arg1);
+                ];
+
+                var instance = this.getInstance(arg0, arg1);
+                try{
+                    data = data.concat([
+                        {key: "HashCode", value: instance.hashCode().toString()},
+                    ]);
+                    data = data.concat([
+                        {key: "Algorithm", value: instance.getAlgorithm()}
+                    ]);
+                } catch (err1) {
+                    fusion_sendError(err1)
+                }
+
+                fusion_sendKeyValueData("cipher.getInstance", data);
+                return instance;
+                
             };
 
             cipher.doFinal.overload("[B").implementation = function (arg0) {
@@ -568,12 +663,39 @@ setTimeout(function() {
 
 function fusion_keyToBase64(key){
     if (key === null || key === undefined) return "IA==";
+    const cName = fusion_getClassName(key);
     try{
+
+        try{
+            if (cName == "java.security.spec.RSAPrivateKeySpec" || (cName == "javax.crypto.spec.SecretKeySpec" && key.getAlgorithm() == "RSA")){
+                return {
+                    classType: cName,
+                    modulus: key.getModulus(),
+                    privateExponent: key.getPrivateExponent(),
+                }
+            }
+        } catch (e1) {}
+
+        /*
+        const cName = fusion_getClassName(key);
+
+        if ("com.android.org.conscrypt.OpenSSLRSAPrivateKey" == cName) return "IA==";
+
+        fusion_sendMessageWithTrace("W", "fusion_keyToBase64\n" + fusion_getClassName(key));
+
+        if ("javax.crypto.spec.SecretKeySpec" == cName) {
+            var algo = key.getAlgorithm();
+            if (algo == "AES") return "IA==";
+        }
         
-        return fusion_bytesToBase64(key.getEncoded())
+        var tst = key.getEncoded();
+        fusion_sendMessageWithTrace("W", "fusion_keyToBase64\n" + fusion_getClassName(tst));
+        */
+        
+        return fusion_bytesToBase64(key.getEncoded());
 
     } catch (err) {
-        fusion_sendMessage("W", err);
-        return "IA==";
+        //fusion_sendMessage("W", `Error: ${err}`)
+        return fusion_stringToBase64(`Error getting key from class (${cName}): ${err}`);
     }
 }

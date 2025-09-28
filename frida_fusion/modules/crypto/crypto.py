@@ -457,6 +457,24 @@ class Crypto(ModuleBase):
                     message=f"Cipher init received\nHashcode: {hashcode}\nOpmode: {opmode}\nKeytype: {key_class}",
                     script_location=script_location
                 )
+        
+        elif module == "cipher.getInstance":
+            hashcode = received_data.get('hashcode', None)
+            algorithm = received_data.get('algorithm', None)
+
+            self._crypto_db.insert_crypto(
+                package=self._package,
+                hashcode=hashcode,
+                algorithm=algorithm,
+                init_key=None
+            )
+            
+            if not self._suppress_messages:
+                Logger.print_message(
+                    level="D",
+                    message=f"Cipher getInstance received\n{stack_trace}",
+                    script_location=script_location
+                )
 
         elif module == "cipher.doFinal":
             hashcode = received_data.get('hashcode', None)
@@ -515,6 +533,18 @@ class Crypto(ModuleBase):
                         message=f"Message digest\nAlgorithm: {algorithm}\nHash: {hash_hex}\n{stack_trace}",
                         script_location=script_location
                     )
+
+        elif module == "KeyFactory.generatePrivate":
+            #print(received_data)
+            pass
+
+        elif module == "KeyFactory.generatePublic":
+            #print(received_data)
+            pass
+
+        elif module == "org.bouncycastle.asn1!init":
+            #print(received_data)
+            pass
 
         return True
 
