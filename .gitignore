@@ -60,6 +60,9 @@ __pycache__
 **/frida_scripts/*
 **/tls_unpinning/*.js
 
+
+!**/reflection/*.js
+
 # Other sources #
 #################
 sources
