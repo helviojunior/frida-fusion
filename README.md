@@ -70,7 +70,7 @@ void    fusion_printMethods(String name);
 void    fusion_waitForClass(String name, CallbackFunction onReady)
 
 # Conversions
-byte[]  fusion_stringToBase64(String message);
+String  fusion_stringToBase64(String message);
 String  fusion_bytesToBase64(byte[] byteArray);
 String  fusion_encodeHex(byte[] byteArray);
 ```
