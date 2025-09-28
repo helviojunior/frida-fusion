@@ -128,22 +128,26 @@ function fusion_getCallerInfo() {
 }
 
 function fusion_sendKeyValueData(module, items) {
-    var st = fusion_getB64StackTrace();
+    try{
+      var st = fusion_getB64StackTrace();
 
-    var data = [];
+      var data = [];
 
-    // Force as String
-    for (let i = 0; i < items.length; i++) {
-        data = data.concat([{key: `${items[i].key}`, value:`${items[i].value}`}]);
+      // Force as String
+      for (let i = 0; i < items.length; i++) {
+          data = data.concat([{key: `${items[i].key}`, value:`${items[i].value}`}]);
+      }
+
+      fusion_Send({
+        type: "key_value_data",
+        module: module,
+        data: data,
+        stack_trace: st
+      }, null);
+    } catch (err) {
+      fusion_sendMessage("W", err)
     }
-
-    fusion_Send({
-      type: "key_value_data",
-      module: module,
-      data: data,
-      stack_trace: st
-    }, null);
-
+    return null;
 }
 
 function fusion_sendMessage(level, message){
