@@ -57,6 +57,7 @@ The Frida Fusion define/expose several functions to be used at frida scripts. Fo
 ```java
 # Send message/data to Frida-Fusion
 void    fusion_sendMessage(String level, String message);
+void    fusion_sendError(Error error);
 void    fusion_sendMessageWithTrace(String level, String message);
 void    fusion_sendKeyValueData(String module, Object items);
 

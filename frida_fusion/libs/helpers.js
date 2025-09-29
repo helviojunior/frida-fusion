@@ -194,9 +194,9 @@ function fusion_sendMessageWithTrace(level, message){
 
 function fusion_sendError(error) {
     try{
-        fusion_sendMessage("E", error + '\n' + error.stack);
+        fusion_sendMessage("E", `${error}\n${error.stack}`);
     } catch (err) {
-        fusion_sendMessage("W", err)
+        fusion_sendMessage("W", `Error: ${err}`);
     }
 }
 

@@ -35,6 +35,7 @@ class Fusion(object):
     print_timestamp = False
     max_filename = 28
 
+    _bundle_pattern = re.compile(r'(fusion_bundle\.js):(\d+)')
     _script_name = Path(__file__).name
     _db_jobs = queue.Queue()
 
@@ -107,25 +108,6 @@ class Fusion(object):
             for k, v in self.script_trace.items()
             if v[0] <= loc.get_int_line() <= v[1]
         ]), loc)
-
-    @classmethod
-    def print_message(cls, level: str = "*", message: str = "",
-                      script_location: ScriptLocation = None):
-
-        if Fusion.running is False and Logger.debug_level >= 2:
-            return
-
-        if script_location is None:
-            script_location = ScriptLocation(
-                file_name=Fusion._script_name
-            )
-
-        Logger.print_message(
-            level=level,
-            message=message,
-            script_location=script_location,
-            filename_col_len=Fusion.max_filename
-        )
 
     def load_all_scripts(self):
         self.script_trace = {}
@@ -334,10 +316,11 @@ class Fusion(object):
                             msg = base64.b64decode(msg).decode("UTF-8")
                         except:
                             pass
-                        self.print_message(mLevel, msg, script_location=script_location)
+
+                        self.print_message_inst(mLevel, msg, script_location=script_location)
 
                     elif mType == "key_value_data":
-                        self.print_message("V", "RAW JSON:\n    %s" % (
+                        self.print_message_inst("V", "RAW JSON:\n    %s" % (
                             json.dumps(jData, indent=4).replace("\n", "\n    ")
                         ), script_location=script_location)
 
@@ -367,7 +350,7 @@ class Fusion(object):
 
                     # Legacy
                     elif mType == "data":
-                        self.print_message("V", "RAW JSON:\n    %s" % (
+                        self.print_message_inst("V", "RAW JSON:\n    %s" % (
                             json.dumps(jData, indent=4).replace("\n", "\n    ")
                         ), script_location=script_location)
 
@@ -391,15 +374,15 @@ class Fusion(object):
 
                     elif mType == "java-uncaught":
                         self.insert_history('frida', json.dumps(jData))
-                        self.print_message("E", jData.get('stack', ''), script_location=script_location)
+                        self.print_message_inst("E", jData.get('stack', ''), script_location=script_location)
 
                     else:
-                        self.print_message(mLevel, message, script_location=script_location)
+                        self.print_message_inst(mLevel, message, script_location=script_location)
 
                 except SilentKillError as sk:
                     skm = str(sk)
 
-                    self.print_message("D", "Silent kill requested",
+                    self.print_message_inst("D", "Silent kill requested",
                                        script_location=Logger.get_caller_info(stack_index=1))
                     Fusion.running = False
                     time.sleep(0.2)
@@ -410,8 +393,8 @@ class Fusion(object):
 
                 except Exception as err:
                     script_location = ScriptLocation(file_name=Fusion._script_name)
-                    self.print_message("E", message, script_location=script_location)
-                    self.print_message("E", payload, script_location=script_location)
+                    self.print_message_inst("E", message, script_location=script_location)
+                    self.print_message_inst("E", payload, script_location=script_location)
                     self.print_exception(err)
 
             else:
@@ -424,20 +407,7 @@ class Fusion(object):
 
                         stack = "Stack trace:\n"
                         stack += message.get('stack', '')
-
-                        pattern = re.compile(r'(fusion_bundle\.js):(\d+)')
-                        matches = [
-                            (
-                                m.group(0),
-                                self.translate_location(dict(
-                                    file_name=m.group(1),
-                                    line=m.group(2),
-                                ))
-                            )
-                            for m in pattern.finditer(stack)
-                        ]
-                        for m in matches:
-                            stack = stack.replace(m[0], f"{m[1].file_name}:{m[1].line}")
+                        stack = self._replace_location(stack)
 
                         if script_location.file_name == "fusion_bundle.js" and len(matches) >= 1:
                             script_location.file_name = matches[0][1].file_name
@@ -453,18 +423,18 @@ class Fusion(object):
                             "stack": stack
                         }))
 
-                        self.print_message("F", description + stack,
+                        self.print_message_inst("F", description + stack,
                                            script_location=script_location)
                         Fusion.running = False
                         time.sleep(0.2)
                         Logger.pl('\n{+} {O}Exiting...{O}{W}')
                         self.done.set()
                     else:
-                        self.print_message("I", message, script_location=script_location)
-                        self.print_message("I", payload, script_location=script_location)
+                        self.print_message_inst("I", message, script_location=script_location)
+                        self.print_message_inst("I", payload, script_location=script_location)
                 except:
-                    self.print_message("I", message, script_location=script_location)
-                    self.print_message("I", payload, script_location=script_location)
+                    self.print_message_inst("I", message, script_location=script_location)
+                    self.print_message_inst("I", payload, script_location=script_location)
 
         return handler
 
@@ -481,6 +451,27 @@ class Fusion(object):
 
         Logger.pl("")
         self.done.set()
+
+
+    def _replace_location(self, message: str) -> str:
+        try:
+            matches = [
+                (
+                    m.group(0),
+                    self.translate_location(dict(
+                        file_name=m.group(1),
+                        line=m.group(2),
+                    ))
+                )
+                for m in Fusion._bundle_pattern.finditer(message)
+            ]
+            for m in matches:
+                message = message.replace(m[0], f"{m[1].file_name}:{m[1].line}")
+        except Exception as e:
+            print(e)
+            pass
+
+        return message
 
     def _raise_key_value_event(self,
                                script_location: ScriptLocation = None,
@@ -499,7 +490,7 @@ class Fusion(object):
                 raise ske
             except Exception as e:
                 if Configuration.debug_level >= 2:
-                    self.print_message("E", f"Error resizing event to module {m.name}: {str(e)}")
+                    self.print_message_inst("E", f"Error resizing event to module {m.name}: {str(e)}")
                 else:
                     self.print_exception(e)
 
@@ -518,9 +509,46 @@ class Fusion(object):
                 raise ske
             except Exception as e:
                 if Configuration.debug_level >= 2:
-                    self.print_message("E", f"Error resizing event to module {m.name}: {str(e)}")
+                    self.print_message_inst("E", f"Error resizing event to module {m.name}: {str(e)}")
                 else:
                     self.print_exception(e)
+
+    def print_message_inst(self, level: str = "*", message: str = "",
+                      script_location: ScriptLocation = None):
+
+        return type(self)._print_message(
+            level=level,
+            message=self._replace_location(message),
+            script_location=script_location
+            )
+
+    @classmethod
+    def print_message(cls, level: str = "*", message: str = "",
+                      script_location: ScriptLocation = None):
+        return cls._print_message(
+            level=level,
+            message=message,
+            script_location=script_location
+            )
+
+    @classmethod
+    def _print_message(cls, level: str = "*", message: str = "",
+                      script_location: ScriptLocation = None):
+
+        if Fusion.running is False and Logger.debug_level >= 2:
+            return
+
+        if script_location is None:
+            script_location = ScriptLocation(
+                file_name=Fusion._script_name
+            )
+
+        Logger.print_message(
+            level=level,
+            message=message,
+            script_location=script_location,
+            filename_col_len=Fusion.max_filename
+        )
 
     @classmethod
     def insert_history(cls,  source: str, data: str, stack_trace: str = ''):
