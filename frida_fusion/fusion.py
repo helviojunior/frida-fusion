@@ -407,7 +407,19 @@ class Fusion(object):
 
                         stack = "Stack trace:\n"
                         stack += message.get('stack', '')
-                        stack = self._replace_location(stack)
+
+                        matches = [
+                            (
+                                m.group(0),
+                                self.translate_location(dict(
+                                    file_name=m.group(1),
+                                    line=m.group(2),
+                                ))
+                            )
+                            for m in Fusion._bundle_pattern.finditer(stack)
+                        ]
+                        for m in matches:
+                            stack = stack.replace(m[0], f"{m[1].file_name}:{m[1].line}")
 
                         if script_location.file_name == "fusion_bundle.js" and len(matches) >= 1:
                             script_location.file_name = matches[0][1].file_name
@@ -432,9 +444,10 @@ class Fusion(object):
                     else:
                         self.print_message_inst("I", message, script_location=script_location)
                         self.print_message_inst("I", payload, script_location=script_location)
-                except:
+                except Exception as e:
                     self.print_message_inst("I", message, script_location=script_location)
                     self.print_message_inst("I", payload, script_location=script_location)
+                    self.print_exception(e)
 
         return handler
 

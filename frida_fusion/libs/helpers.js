@@ -22,6 +22,10 @@ function fusion_Send(payload1, payload2){
     send(message, payload2);
 }
 
+function fusion_classExists(name) { try { Java.use(name); return true; } catch (_) { return false; } }
+
+function fusion_useOrNull(name) { try { return Java.use(name); } catch (e) { return null; } }
+
 function fusion_waitForClass(name, onReady) {
     var intv = setInterval(function () {
       try {
@@ -36,6 +40,37 @@ function fusion_printStackTrace(){
     var trace = Java.use("android.util.Log").getStackTraceString(Java.use("java.lang.Exception").$new());
     trace = trace.replace("java.lang.Exception\n", "Stack trace:\n");
     fusion_sendMessage("I", trace);
+}
+
+function fusion_toLongPrimitive(v, fallback /* opcional */) {
+  const FB = (typeof fallback === 'number') ? fallback : -1;
+
+  try {
+    // Já é número JS
+    if (typeof v === 'number') {
+      // garante inteiro (contentLength é integral)
+      return Math.trunc(v);
+    }
+
+    if (v === null || v === undefined) return FB;
+
+    // java.lang.Long / Integer / Short (ou qualquer Number com longValue/intValue)
+    if (v.longValue)  { try { return v.longValue();  } catch (_) {} }
+    if (v.intValue)   { try { return v.intValue();   } catch (_) {} }
+    if (v.shortValue) { try { return v.shortValue(); } catch (_) {} }
+
+    // String numérica
+    if (typeof v === 'string' || (v.toString && typeof v.toString() === 'function')) {
+      const s = String(v);
+      if (/^-?\d+$/.test(s)) {
+        const JLong = Java.use('java.lang.Long');
+        // parseia com Java para respeitar faixa de long
+        return JLong.parseLong(s);
+      }
+    }
+  } catch (_) {}
+
+  return FB;
 }
 
 function fusion_toBytes(message){
@@ -236,6 +271,8 @@ function fusion_printMethods(targetClass)
   });
 }
 
+
+//java.lang.Class
 function fusion_getClassName(obj)
 {
   if (obj === null || obj === undefined) return "";
@@ -244,17 +281,23 @@ function fusion_getClassName(obj)
         // Caso seja um objeto Java real
         if (obj.$className !== undefined) {
             // Objetos instanciados via Java.use
-            return obj.$className;
+            var name = obj.$className;
+            if (name == "java.lang.Class") return obj.getName();
+            return name;
         }
 
         // Caso seja uma instância Java (não necessariamente via Java.use)
         if (Java.isJavaObject(obj)) {
-            return obj.getClass().getName();
+            var name = obj.getClass().getName();
+            if (name == "java.lang.Class") return obj.getName();
+            return name;
         }
 
         // Caso seja uma classe Java carregada (Java.use)
         if (Java.isJavaClass(obj)) {
-            return obj.class.getName();
+            var name = obj.class.getName();
+            if (name == "java.lang.Class") return obj.getName();
+            return name;
         }
 
         // Se for algo não Java, apenas retorna tipo do JS
