@@ -472,7 +472,7 @@ class Crypto(ModuleBase):
             if not self._suppress_messages:
                 Logger.print_message(
                     level="D",
-                    message=f"Cipher getInstance received\n{stack_trace}",
+                    message=f"Cipher getInstance received\nHashcode: {hashcode}\nAlgorithm: {algorithm}\n{stack_trace}",
                     script_location=script_location
                 )
 
@@ -496,9 +496,15 @@ class Crypto(ModuleBase):
             )
 
             if not self._suppress_messages:
+                data=json.dumps(dict(
+                    hashcode=hashcode,
+                    before_final=received_data.get('input', ''),
+                    after_final=received_data.get('output', ''),
+                    ), default=Logger.json_serial, indent=4, sort_keys=False)
+
                 Logger.print_message(
                     level="D",
-                    message=f"Cipher doFinal received\n{stack_trace}",
+                    message=f"Cipher doFinal received\n{data}\n{stack_trace}",
                     script_location=script_location
                 )
 
