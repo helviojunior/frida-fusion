@@ -287,23 +287,23 @@ function fusion_getClassName(obj)
         }
 
         // Caso seja uma instância Java (não necessariamente via Java.use)
-        if (Java.isJavaObject(obj)) {
+        if (typeof obj === 'object' && typeof obj.getClass === 'function') {
             var name = obj.getClass().getName();
-            if (name == "java.lang.Class") return obj.getName();
+            if (name == "java.lang.Class" && typeof obj.getClass === 'function') return obj.getName();
             return name;
         }
 
         // Caso seja uma classe Java carregada (Java.use)
-        if (Java.isJavaClass(obj)) {
+        if (typeof obj === 'object' && obj.class !== undefined ) {
             var name = obj.class.getName();
-            if (name == "java.lang.Class") return obj.getName();
+            if (name == "java.lang.Class" && typeof obj.getClass === 'function') return obj.getName();
             return name;
         }
 
         // Se for algo não Java, apenas retorna tipo do JS
         return typeof obj;
     } catch (err) {
-        fusion_sendMessage("W", `Error: ${err}`)
+        fusion_sendMessage("W", `Error: ${err}\n${err.stack}`)
         return '';
     }
 
