@@ -2,6 +2,60 @@
     Author: Helvio Junior - M4v3r1ck
 */
 
+// Lista de classes típicas do React Native (pode ampliar se quiser)
+const FUSION_DEFAULT_REACT_CLASSES = [
+    "com.facebook.react.ReactApplication",
+    "com.facebook.react.ReactInstanceManager",
+    "com.facebook.react.bridge.ReactContext",
+    "com.facebook.react.bridge.JavaScriptModule",
+    "com.facebook.react.bridge.NativeModule",
+    "com.facebook.react.modules.core.DeviceEventManagerModule",
+    "com.facebook.react.bridge.ReactApplicationContext"
+];
+
+/**
+ * Tenta determinar se a app tem indícios de ser React Native.
+ * Estratégia:
+ *  - tenta Java.use em classes conhecidas (se lançar, ignora)
+ *  - verifica classes já carregadas (enumerateLoadedClassesSync)
+ *
+ * Retorna true/false.
+ */
+function fusion_isReactNativeApp(reactClasses) {
+    reactClasses = reactClasses || FUSION_DEFAULT_REACT_CLASSES;
+    if (!Java.available) return false;
+
+    try {
+        // 1) tentativa de usar as classes (pode carregar a classe se presente)
+        for (var i = 0; i < reactClasses.length; i++) {
+            try {
+                Java.use(reactClasses[i]);
+                return true; // encontrou uma classe RN na ClassLoader
+            } catch (e) {
+                // não encontrado/erro: continuar
+            }
+        }
+
+        // 2) se nada foi encontrado via Java.use, verificar classes já carregadas
+        try {
+            var loaded = Java.enumerateLoadedClassesSync();
+            for (var j = 0; j < loaded.length; j++) {
+                var name = loaded[j];
+                for (var k = 0; k < reactClasses.length; k++) {
+                    if (name.indexOf(reactClasses[k]) !== -1 || name === reactClasses[k]) {
+                        return true;
+                    }
+                }
+            }
+        } catch (e) {
+            // enumerateLoadedClassesSync pode falhar em alguns contextos; ignorar
+        }
+    } catch (outer) {
+        // fallback
+    }
+    return false;
+}
+
 function fusion_rawSend(payload1){
     send(payload1);
 }
