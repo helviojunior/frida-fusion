@@ -141,15 +141,18 @@ setTimeout(function() { // avoid java.lang.ClassNotFoundException
                 // OkHttp: Response intercept(Interceptor.Chain)
                 intercept: function(chain) {
                     const level = OKHTTP_LOGGING_DATA.CURRENT_LEVEL;
+                    let response;
+                    let proceeded = false;
                     try {
+                        // Usage in your intercept(chain):
+                        const first = firstTimeForCall(chain);
+                        if (!first) return chain.proceed(chain.request());
+
                         const request = chain.request();
                         if (level === Level.NONE) {
                             return chain.proceed(request);
                         }
 
-                        // Usage in your intercept(chain):
-                        const first = firstTimeForCall(chain);
-                        if (!first) return chain.proceed(request);
                         // ... do your logging once ...
 
                         const TimeUnit = Java.use('java.util.concurrent.TimeUnit');
@@ -240,8 +243,9 @@ setTimeout(function() { // avoid java.lang.ClassNotFoundException
                         }
 
                         const start = Java.use('java.lang.System').nanoTime();
-                        let response;
+                        
                         try {
+                            proceeded = true;
                             response = chain.proceed(request);
                         } catch (ex) {
 
@@ -385,7 +389,7 @@ setTimeout(function() { // avoid java.lang.ClassNotFoundException
                         return response;
                     } catch (e) {
                         fusion_sendMessage("W", `Interceptor error: ${e} \n${e.stack}`)
-                        return chain.proceed(chain.request());
+                        throw e;
                     }
                 }
             }
@@ -416,7 +420,7 @@ setTimeout(function() { // avoid java.lang.ClassNotFoundException
                     if (!has){
                         // addInterceptor
                         try {
-                            this.addInterceptor(MyInterceptor.$new());
+                            //this.addInterceptor(MyInterceptor.$new());
                         } catch (_) {}
                     }
 
