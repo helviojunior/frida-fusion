@@ -106,8 +106,6 @@ class Configuration(object):
 
         Color.pl('{+} {W}Startup parameters')
 
-        Logger.pl('     {C}command line:{O} %s{W}' % Configuration.cmd_line)
-
         if args.out_file is not None and args.out_file != '':
             Configuration.out_file = args.out_file
             try:
@@ -135,6 +133,8 @@ class Configuration(object):
         if args.app_id is not None and args.pid > 0:
             Color.pl('{!} {R}error: you must specify just one parameter {O}--package{R} or {O}--attach-pid{R}{W}\r\n')
             Configuration.mandatory()
+
+        Logger.pl('     {C}command line:{O} %s{W}' % Configuration.cmd_line)
 
         if args.app_id is not None:
             Configuration.package = args.app_id
