@@ -70,6 +70,8 @@ class Configuration(object):
 
         sys.argv[0] = 'frida-fusion'
 
+        Configuration.cmd_line = ' '.join([word for word in sys.argv])
+
         list_modules = any(['--list-modules' == word for word in sys.argv])
         #show_help = any(['-h' == word for word in sys.argv])
 
@@ -103,6 +105,8 @@ class Configuration(object):
         Configuration.args = args
 
         Color.pl('{+} {W}Startup parameters')
+
+        Logger.pl('     {C}command line:{O} %s{W}' % Configuration.cmd_line)
 
         if args.out_file is not None and args.out_file != '':
             Configuration.out_file = args.out_file
