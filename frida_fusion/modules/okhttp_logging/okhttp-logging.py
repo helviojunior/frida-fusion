@@ -1,3 +1,4 @@
+import base64
 import errno
 import os.path
 import json
@@ -48,13 +49,10 @@ class OkHttpLogging(ModuleBase):
                         ) -> bool:
 
         if module == "okhttp!intercept":
-
             if not self._suppress_messages:
-                data=json.dumps(received_data, default=Logger.json_serial, indent=4, sort_keys=False)
-
                 Logger.print_message(
                     level="I",
-                    message=f"HTTP package\n{data}",
+                    message=self.format_output(received_data),
                     script_location=script_location
                 )
 
@@ -77,4 +75,59 @@ class OkHttpLogging(ModuleBase):
                    ) -> bool:
         return True
 
+    def format_output(self, received_data: dict = None) -> str:
+        unk = "<unknown>"
+        error = received_data.get("error", None)
+        response_code = received_data.get("response-code", None)
+        elapsed_ime = received_data.get("elapsed-time", "")
+        method = received_data.get("method", unk)
+        url = received_data.get("url", unk)
+        protocol = (received_data.get("protocol", unk) or unk).upper()
+        headers = received_data.get("request-header", "").replace("\r", "")
+        data = f'--> {method} {url} {protocol}\n'
+        data += f'{headers}\n'
+        request_body = received_data.get("request-body", None)
+        try:
+            if request_body is not None and request_body.strip() != "":
+                request_body = base64.b64decode(request_body.encode("UTF-8")).decode("UTF-8")
+            else:
+                request_body = None
+        except Exception:
+            pass
 
+        if request_body is not None:
+            data += f'{request_body}\n\n'
+
+        if error is not None:
+            data += f'<-- HTTP ERROR ({elapsed_ime}ms)\n'
+            data += f'{error}\n'
+
+        if response_code is not None:
+            response_status = received_data.get("response-status", None)
+            response_body = received_data.get("response-body", None)
+            response_header = received_data.get("response-header", "")
+            try:
+                if response_body is not None and response_body.strip() != "":
+                    response_body = base64.b64decode(response_body.encode("UTF-8")).decode("UTF-8")
+                else:
+                    response_body = None
+            except Exception:
+                pass
+
+            # Try to decode as json
+            try:
+                response_body = json.dumps(
+                    json.loads(response_body),
+                    default=Logger.json_serial,
+                    indent=4, sort_keys=False)
+            except Exception:
+                pass
+
+            data += f'<-- {response_code} {response_status} ({elapsed_ime}ms)\n'
+            data += f'{response_header}\n'
+            if response_body is not None:
+                data += f'{response_body}\n\n'
+
+        data += f'<-- END HTTP\n'
+
+        return data
