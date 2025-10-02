@@ -181,6 +181,55 @@ function fusion_bytesToBase64(byteArray){
     }
 }
 
+function fusion_base64ToString(b64) {
+  try {
+    const StringClass  = Java.use('java.lang.String');
+    const Base64Class  = Java.use('android.util.Base64');
+
+    // Flags úteis (só para referência/legibilidade)
+    const BASE64_DEFAULT  = 0x00000000; // decode padrão
+    const BASE64_URL_SAFE = 0x00000008; // para strings base64 url-safe
+
+    // Normaliza entrada
+    let s = ('' + b64).trim();
+    // Remove prefixo data URI, se existir
+    s = s.replace(/^data:.*;base64,/, '');
+    // Remove espaços/linhas quebradas
+    s = s.replace(/\s+/g, '');
+
+    // Função para padding quando faltam '='
+    function padBase64(x) {
+      const m = x.length % 4;
+      return m === 0 ? x : x + '===='.slice(m);
+    }
+
+    let decoded = null;
+
+    // 1) Tenta DEFAULT
+    try {
+      decoded = Base64Class.decode(s, BASE64_DEFAULT);
+    } catch (e1) {
+      // 2) Tenta URL_SAFE
+      try {
+        decoded = Base64Class.decode(s, BASE64_URL_SAFE);
+      } catch (e2) {
+        // 3) Tenta com padding
+        const sp = padBase64(s);
+        decoded = Base64Class.decode(sp, BASE64_DEFAULT);
+      }
+    }
+
+    // Converte bytes -> String UTF-8
+    const result = StringClass.$new(decoded, 'utf-8').toString();
+    return result;
+
+  } catch (err) {
+    // mesmo logger que você usa na encode
+    fusion_sendMessage("W", err);
+    return null;
+  }
+}
+
 function fusion_normalizePtr(addr) {
   let p = ptr(addr);
   if (Process.arch === 'arm64') p = p.and('0x00FFFFFFFFFFFFFF'); // limpa TBI
