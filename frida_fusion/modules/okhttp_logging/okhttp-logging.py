@@ -75,7 +75,8 @@ class OkHttpLogging(ModuleBase):
                    ) -> bool:
         return True
 
-    def format_output(self, received_data: dict = None) -> str:
+    @classmethod
+    def format_output(cls, received_data: dict = None) -> str:
         unk = "<unknown>"
         error = received_data.get("error", None)
         response_code = received_data.get("response-code", None)

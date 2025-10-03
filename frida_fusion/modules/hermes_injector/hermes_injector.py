@@ -1,6 +1,7 @@
 import errno
 import os.path
 import base64
+import sys
 from pathlib import Path
 from argparse import _ArgumentGroup, Namespace
 from frida_fusion.libs.logger import Logger
@@ -15,6 +16,7 @@ class HermesJSInjector(ModuleBase):
         self.mod_path = str(Path(__file__).resolve().parent)
         self.js_file = os.path.join(self.mod_path, "hermes_injector.js")
         self.hermes_js_file = ""
+        self._suppress_messages = False
 
     def start_module(self, **kwargs) -> bool:
         pass
@@ -32,12 +34,12 @@ class HermesJSInjector(ModuleBase):
     
     def add_params(self, flags: _ArgumentGroup):
         flags.add_argument('--hermes-js-script',
-                         dest='hermes_js_file',
-                         metavar='file',
-                         default=None,
-                         required=True,
-                         type=str,
-                         help='Hermes JS file path')
+                           dest='hermes_js_file',
+                           metavar='file',
+                           default=None,
+                           required=True,
+                           type=str,
+                           help='Hermes JS file path')
 
     def load_from_arguments(self, args: Namespace) -> bool:
         if args.hermes_js_file is None:
@@ -58,13 +60,13 @@ class HermesJSInjector(ModuleBase):
 
         except IOError as x:
             if x.errno == errno.EACCES:
-                Color.pl('{!} {R}error: could not open hermes js file {O}permission denied{R}{W}\r\n')
+                Logger.pl('{!} {R}error: could not open hermes js file {O}permission denied{R}{W}\r\n')
                 sys.exit(1)
             elif x.errno == errno.EISDIR:
-                Color.pl('{!} {R}error: could not open hermes js file {O}it is an directory{R}{W}\r\n')
+                Logger.pl('{!} {R}error: could not open hermes js file {O}it is an directory{R}{W}\r\n')
                 sys.exit(1)
             else:
-                Color.pl('{!} {R}error: could not open hermes js file: %s{W}\r\n' % str(x))
+                Logger.pl('{!} {R}error: could not open hermes js file: %s{W}\r\n' % str(x))
                 sys.exit(1)
 
         return True
