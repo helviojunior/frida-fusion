@@ -64,7 +64,7 @@ class Reflection(ModuleBase):
             self.get_constraints(conn)
 
     def __init__(self):
-        super().__init__('Reflection Stalker', 'Monitor reflection calls/invoke by Helvio Junior (M4v3r1ck)')
+        super().__init__('Reflection Stalker', 'Monitor reflection calls/invoke')
         self.mod_path = str(Path(__file__).resolve().parent)
         self._stalker_db = None
         self._suppress_messages = False

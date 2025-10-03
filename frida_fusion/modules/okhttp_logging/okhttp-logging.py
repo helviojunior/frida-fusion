@@ -11,7 +11,7 @@ from frida_fusion.libs.scriptlocation import ScriptLocation
 class OkHttpLogging(ModuleBase):
 
     def __init__(self):
-        super().__init__('OkHttp3 logging', 'Use okhttp-logging by Helvio Junior (M4v3r1ck)')
+        super().__init__('OkHttp3 logging', 'Use okhttp-logging')
         self.mod_path = str(Path(__file__).resolve().parent)
         self.js_file = os.path.join(self.mod_path, "okhttp-logging.js")
         self._suppress_messages = False
