@@ -1,9 +1,6 @@
 import json
 import os.path
 from pathlib import Path
-import base64
-import string
-
 from frida_fusion.libs.logger import Logger
 from frida_fusion.libs.database import Database
 from frida_fusion.libs.scriptlocation import ScriptLocation
@@ -11,7 +8,6 @@ from frida_fusion.module import ModuleBase
 
 
 class SharedPreferences(ModuleBase):
-
     _hide_commons = [
         "RCTI18nUtil",
         "NETWORK_USAGE_TRACKING_",
@@ -84,8 +80,6 @@ class SharedPreferences(ModuleBase):
                         received_data: dict = None
                         ) -> bool:
 
-
-
         if 'SharedPreferences.' in module:
             try:
                 received_data['args'] = json.loads(received_data.get('args', "[]"))
@@ -103,7 +97,7 @@ class SharedPreferences(ModuleBase):
             s_result = received_data.get('result', "")
             if not isinstance(s_result, str):
                 s_result = json.dumps(s_result, default=Logger.json_serial)
-            
+
             class_name = received_data.get('class', '<unknown>')
             s_method = received_data.get('method', '<unknown>')
 
@@ -117,27 +111,32 @@ class SharedPreferences(ModuleBase):
                 result=s_result,
                 stack_trace=stack_trace
             )
-            
+
         if module in [
-                "SharedPreferences.getString",
-                "SharedPreferences.getInt",
-                "SharedPreferences.getLong",
-                "SharedPreferences.getFloat",
-                "SharedPreferences.getStringSet",
-                "SharedPreferences.putString",
-                "SharedPreferences.putInt",
-                "SharedPreferences.putLong",
-                "SharedPreferences.putFloat",
-                "SharedPreferences.putStringSet",
-            ]:
+            "SharedPreferences.getString",
+            "SharedPreferences.getInt",
+            "SharedPreferences.getLong",
+            "SharedPreferences.getFloat",
+            "SharedPreferences.getStringSet",
+            "SharedPreferences.putString",
+            "SharedPreferences.putInt",
+            "SharedPreferences.putLong",
+            "SharedPreferences.putFloat",
+            "SharedPreferences.putStringSet",
+        ]:
             if self._check_show(received_data):
+                class_name = received_data.get('class', '<unknown>')
+                s_method = received_data.get('method', '<unknown>')
+
                 l_args = ', '.join([
-                    "null" if v is None else (str(v) if isinstance(v, float) else (str(v) if isinstance(v, int) else f"'{str(v)}'" if isinstance(v, str) else f"{str(v)}"))
+                    "null" if v is None else (str(v) if isinstance(v, float) else (
+                        str(v) if isinstance(v, int) else f"'{str(v)}'" if isinstance(v, str) else f"{str(v)}"))
                     for v in received_data.get('args', [])
-                    ])
+                ])
                 data = "null"
                 try:
-                    data = json.dumps(received_data.get('result', None), default=Logger.json_serial, indent=4, sort_keys=False)
+                    data = json.dumps(received_data.get('result', None), default=Logger.json_serial, indent=4,
+                                      sort_keys=False)
                 except Exception:
                     pass
                 Logger.print_message(
@@ -148,7 +147,7 @@ class SharedPreferences(ModuleBase):
 
         if 'SharedPreferences.' in module:
             if self._check_show(received_data):
-                data=json.dumps(received_data, default=Logger.json_serial, indent=4, sort_keys=False)
+                data = json.dumps(received_data, default=Logger.json_serial, indent=4, sort_keys=False)
                 Logger.print_message(
                     level="D",
                     message=f"{module}:\n{data}\n{stack_trace}",
@@ -162,7 +161,7 @@ class SharedPreferences(ModuleBase):
                    stack_trace: str = None,
                    received_data: str = None
                    ) -> bool:
-        #Nothing by now
+        # Nothing by now
         return True
 
     def _check_show(self, received_data: dict = None) -> bool:
@@ -177,8 +176,4 @@ class SharedPreferences(ModuleBase):
             True
             for k in SharedPreferences._hide_commons
             if k in c_args
-            ])
-
-
-
-
+        ])
