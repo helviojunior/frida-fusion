@@ -453,7 +453,7 @@ class Crypto(ModuleBase):
 
             if not self._suppress_messages:
                 Logger.print_message(
-                    level="W",
+                    level="I",
                     message=f"Cipher init received\nHashcode: {hashcode}\nOpmode: {opmode}\nKeytype: {key_class}",
                     script_location=script_location
                 )
