@@ -1,4 +1,5 @@
 # Frida Fusion 
+<img src="./fusion_logo.svg" alt="Frida Fusion logo" align="right" width="20%"/>
 
 Hook your mobile tests with Frida.
 
