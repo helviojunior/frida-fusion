@@ -2,3 +2,4 @@ colorama
 requests>=2.23.0
 frida>=15.1.17
 frida-tools>=10.8.0
+cryptography>=45.0.7

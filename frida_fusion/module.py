@@ -3,6 +3,9 @@ import sys
 import re
 from argparse import _ArgumentGroup, Namespace
 
+import inspect
+from typing import Optional
+
 import frida
 import pkgutil
 import importlib
@@ -110,7 +113,14 @@ class Module(object):
         self.module = module
         self.qualname = qualname
         self._class = class_name
+        self.py_file = Path(__file__)
         pass
+
+    def __str__(self):
+        return f"<{self.__class__.__qualname__} {self.name}>"
+
+    def __repr__(self):
+        return str(self.name)
 
     def safe_name(self):
         return ModuleBase.get_safe_name(self.name)
@@ -132,6 +142,10 @@ class InternalModule(Module):
 
 
 class ExternalModule(Module):
+    pass
+
+
+class LocalModule(Module):
     pass
 
 
@@ -164,7 +178,10 @@ class ModuleManager:
                 spec.loader.exec_module(mod)
                 loaded_files.add(real)
         except Exception as ie:
-            Logger.pl('\n{!} {R}Error loading external module: {G}%s{R}\n    {O} %s{W}' % (str(ie), str(real)))
+            Logger.print_exception('\n{!} {R}Error loading external module: {G}%s{R}\n    {O} %s{W}\n' % (
+                str(ie), str(real)))
+
+            sys.exit(2)
             pass
 
     @classmethod
@@ -201,8 +218,14 @@ class ModuleManager:
             cls._safe_import_from_path(py, loaded_files)
 
     @classmethod
-    def list_modules(cls) -> dict:
-        if ModuleManager.initialized:
+    def _get_class_path(cls, class_def) -> Optional[Path]:
+        # Tenta pegar o arquivo-fonte .py quando existir
+        path = inspect.getsourcefile(class_def) or inspect.getfile(class_def)
+        return Path(path).resolve() if path else None
+
+    @classmethod
+    def list_modules(cls, local_path: Path = None) -> dict:
+        if ModuleManager.initialized and local_path is None:
             return ModuleManager.modules
 
         try:
@@ -214,6 +237,7 @@ class ModuleManager:
             internal_mod_roots = [p for p in base_path.iterdir() if p.is_dir()]
 
             internal_mods = []
+            local_files: set[Path] = set()
 
             # Vamos usar pkgutil para o pacote interno (mantém o comportamento)
             loaded_files: set[Path] = set()
@@ -255,17 +279,52 @@ class ModuleManager:
                     # opcional: restaurar sys.path (seguro para evitar vazamentos)
                     sys.path[:] = original_sys_path
 
-            # --- 3) Instanciar subclasses de ModuleBase e montar o registry ---
+            # --- 3) Varredura de caminhos externos via local_path parameter ---
+            if local_path is not None and isinstance(local_path, Path) and local_path.exists():
+
+                if local_path.is_dir():
+
+                    for py in local_path.glob("*.py"):
+                        # exclui caches e similares
+                        if any(part in {"__pycache__"} for part in py.parts):
+                            continue
+                        cls._safe_import_from_path(py, local_files)
+                elif local_path.suffix.lower() == ".py":
+                    cls._safe_import_from_path(local_path, local_files)
+
+            # --- 4) Instanciar subclasses de ModuleBase e montar o registry ---
             for i_class in ModuleBase.__subclasses__():
                 t = i_class()
                 key = t.safe_name()
-                if key in ModuleManager.modules:
+                c_path = ModuleManager._get_class_path(i_class)
+                m_file = next(iter(
+                    v.py_file
+                    for k, v in ModuleManager.modules.items()
+                    if k == key
+                    and c_path is not None
+                    and c_path == v.py_file
+                ), None)
+
+                # Already exists and the python file is different
+                if key in ModuleManager.modules and m_file is not None:
                     raise ModuleLoaderError(
                         f"Duplicated Module name: {i_class.__module__}.{i_class.__qualname__}"
                     )
 
+                # Already exists and already imported
+                if m_file is not None:
+                    continue
+
                 if str(i_class.__module__) in internal_mods:
                     ModuleManager.modules[key] = InternalModule(
+                        name=t.name,
+                        description=t.description,
+                        module=str(i_class.__module__),
+                        qualname=str(i_class.__qualname__),
+                        class_name=i_class,
+                    )
+                elif c_path is not None and c_path in local_files:
+                    ModuleManager.modules[key] = LocalModule(
                         name=t.name,
                         description=t.description,
                         module=str(i_class.__module__),
@@ -280,6 +339,15 @@ class ModuleManager:
                         qualname=str(i_class.__qualname__),
                         class_name=i_class,
                     )
+
+            # Ordenado por grupo e nome
+            ModuleManager.modules = dict(sorted(
+                ModuleManager.modules.items(),
+                key=lambda kv: (
+                    {InternalModule: 0, ExternalModule: 1, LocalModule: 2}.get(type(kv[1]), 3),
+                    kv[1].name.casefold()
+                )
+            ))
 
             ModuleManager.initialized = True
             return ModuleManager.modules

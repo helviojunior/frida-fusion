@@ -84,9 +84,9 @@ class Fusion(object):
                 elif Configuration.remote_host is not None:
                     self.device = process.add_remote_device(Configuration.remote_host)
 
-        except Exception as e:
+        except Exception as err:
             self.device = None
-            Logger.pl('\n{!} {R}Error:{O} %s{W}' % str(e))
+            Logger.print_exception(err)
 
         return self.device
 
@@ -144,7 +144,8 @@ class Fusion(object):
                 src += dyn
 
         if os.path.isfile(Configuration.frida_scripts):
-            files_js += [Configuration.frida_scripts]
+            if Path(Configuration.frida_scripts).suffix.lower() == ".js":
+                files_js += [Configuration.frida_scripts]
         else:
             files_js += [
                 os.path.join(Configuration.frida_scripts, f)
@@ -152,7 +153,15 @@ class Fusion(object):
                 if f.endswith(".js")
             ]
 
+        # Keep unique files
+        # Do not use list(set(files_js)) because it will lose the order of modules
+        done: set[str] = set()
         for file_path in files_js:
+            if file_path in done:
+                continue
+
+            done.add(file_path)
+
             file_name = Path(file_path).name
             file_data = self.sanitize_js(open(file_path, 'r', encoding='utf-8').read())
             if '#NOLOAD' in file_data:
@@ -172,7 +181,7 @@ class Fusion(object):
 
                 line_cnt = len(file_data.split("\n")) - 1
 
-                self.script_trace[file_name] = (offset, offset + line_cnt)
+                self.script_trace[file_name] = (offset, offset + line_cnt - 1)
                 offset += line_cnt
 
                 src += file_data
@@ -186,10 +195,17 @@ class Fusion(object):
             s = self.session.create_script(src, name="fusion_bundle")
             s.on("message", self.make_handler("fusion_bundle.js"))  # register the message handler
             s.load()
-        except Exception as e:
-
+        except Exception as err:
             try:
-                err = str(e)
+                from traceback import format_exc
+                err_txt = 'Error:{O} %s{W}' % str(err)
+                err_txt += '\n{O}Full stack trace below\n'
+                err_txt += format_exc().strip()
+
+                err_txt = err_txt.replace('\n', '\n{W}   ')
+                err_txt = err_txt.replace('  File', '{W}{D}File')
+                err_txt = err_txt.replace('  Exception: ', '{R}Exception: {O}')
+
                 pattern = re.compile(r'script\(line (\d+)\):')
                 matches = [
                     (
@@ -199,15 +215,16 @@ class Fusion(object):
                             line=m.group(1),
                         ))
                     )
-                    for m in pattern.finditer(err)
+                    for m in pattern.finditer(err_txt)
                 ]
                 for m in matches:
-                    err = err.replace(m[0], f"{m[1].file_name}(line {m[1].line})")
-                Logger.pl('{!} {R}Error:{O} %s{W}' % err)
+                    err_txt = err_txt.replace(m[0], f"{m[1].file_name}(line {m[1].line})")
+
+                Logger.pl(err_txt)
                 print("")
                 sys.exit(1)
-            except Exception:
-                Logger.pl('{!} {R}Error:{O} %s{W}' % str(e))
+            except Exception as e2:
+                Logger.print_exception(e2)
                 print("")
                 sys.exit(1)
 
@@ -383,7 +400,7 @@ class Fusion(object):
                     skm = str(sk)
 
                     self.print_message_inst("D", "Silent kill requested",
-                                       script_location=Logger.get_caller_info(stack_index=1))
+                                            script_location=Logger.get_caller_info(stack_index=1))
                     Fusion.running = False
                     time.sleep(0.2)
                     if skm != "":
@@ -436,7 +453,7 @@ class Fusion(object):
                         }))
 
                         self.print_message_inst("F", description + stack,
-                                           script_location=script_location)
+                                                script_location=script_location)
                         Fusion.running = False
                         time.sleep(0.2)
                         Logger.pl('\n{+} {O}Exiting...{O}{W}')
@@ -464,7 +481,6 @@ class Fusion(object):
 
         Logger.pl("")
         self.done.set()
-
 
     def _replace_location(self, message: str) -> str:
         try:
@@ -501,11 +517,11 @@ class Fusion(object):
                 )
             except SilentKillError as ske:
                 raise ske
-            except Exception as e:
-                if Configuration.debug_level >= 2:
-                    self.print_message_inst("E", f"Error resizing event to module {m.name}: {str(e)}")
-                else:
-                    self.print_exception(e)
+            except Exception as err:
+                self.print_exception(
+                    err,
+                    script_location=Logger.get_error_info_from_format_exc(stack_index=-1)
+                )
 
     def _raise_data_event(self,
                           script_location: ScriptLocation = None,
@@ -520,14 +536,14 @@ class Fusion(object):
                 )
             except SilentKillError as ske:
                 raise ske
-            except Exception as e:
-                if Configuration.debug_level >= 2:
-                    self.print_message_inst("E", f"Error resizing event to module {m.name}: {str(e)}")
-                else:
-                    self.print_exception(e)
+            except Exception as err:
+                self.print_exception(
+                    err,
+                    script_location=Logger.get_error_info_from_format_exc(stack_index=-1)
+                )
 
     def print_message_inst(self, level: str = "*", message: str = "",
-                      script_location: ScriptLocation = None):
+                           script_location: ScriptLocation = None):
 
         return type(self)._print_message(
             level=level,
@@ -546,7 +562,7 @@ class Fusion(object):
 
     @classmethod
     def _print_message(cls, level: str = "*", message: str = "",
-                      script_location: ScriptLocation = None):
+                       script_location: ScriptLocation = None):
 
         if Fusion.running is False and Logger.debug_level >= 2:
             return
@@ -580,7 +596,7 @@ class Fusion(object):
             db.insert_history(**kwargs)
 
     @classmethod
-    def print_exception(cls, err):
+    def print_exception(cls, err, script_location: ScriptLocation = None):
         from traceback import format_exc
         err_txt = 'Error:{O} %s{W}' % str(err)
         err_txt += '\n{O}Full stack trace below\n'
@@ -594,7 +610,7 @@ class Fusion(object):
             level="E",
             message=Color.s(err_txt),
             filename_col_len=Fusion.max_filename,
-            script_location=Logger.get_caller_info(stack_index=2)
+            script_location=script_location if script_location is not None else Logger.get_caller_info(stack_index=2)
         )
 
     @classmethod

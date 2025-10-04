@@ -7,7 +7,7 @@ import signal
 from argparse import Namespace
 from pathlib import Path
 
-from .module import Module, ModuleManager, InternalModule, ExternalModule
+from .module import Module, ModuleManager, InternalModule, ExternalModule, LocalModule
 from .libs.color import Color
 from .libs.logger import Logger
 from .__meta__ import __version__
@@ -188,9 +188,10 @@ class Configuration(object):
 
         Logger.pl('     {C}min debug level:{O} %s{W}' % str(args.debug_level).upper())
 
+        mods = ModuleManager.list_modules(local_path=Path(Configuration.frida_scripts))
         if (args.enabled_modules is not None and isinstance(args.enabled_modules, list)) or \
                 (args.ignore_messages_modules is not None and isinstance(args.ignore_messages_modules, list)):
-            mods = ModuleManager.list_modules()
+
             for mod in [
                 m.strip()
                 for md in args.enabled_modules
@@ -210,6 +211,7 @@ class Configuration(object):
                 name = fm.safe_name()
                 if name not in Configuration.enabled_modules.keys():
                     Configuration.enabled_modules[name] = fm
+
             if args.ignore_messages_modules is not None and isinstance(args.ignore_messages_modules, list):
                 for mod in [
                     m.strip()
@@ -230,6 +232,14 @@ class Configuration(object):
                     name = fm.safe_name()
                     if name not in Configuration.ignore_messages_modules.keys():
                         Configuration.ignore_messages_modules[name] = fm
+
+        # Enable user defined local modules
+        for _, fm in mods.items():
+            if isinstance(fm, LocalModule):
+                name = fm.safe_name()
+                if name not in Configuration.ignore_messages_modules.keys():
+                    Configuration.ignore_messages_modules[name] = fm
+                    Configuration.enabled_modules[name] = fm
 
         if len(Configuration.enabled_modules) > 0:
             Logger.pl('     {C}modules:{O} %s{W}' % ', '.join([

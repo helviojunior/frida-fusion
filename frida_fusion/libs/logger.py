@@ -4,7 +4,9 @@ import base64
 import inspect
 import json
 import datetime
+import re
 from pathlib import Path
+from typing import Optional
 
 from .scriptlocation import ScriptLocation
 from ..libs.color import Color
@@ -81,6 +83,31 @@ class Logger(object):
             file_name=script_name,
             function_name=function_name,
             line=str(line_number)
+        )
+
+    @classmethod
+    def get_error_info_from_format_exc(cls, stack_index: int = -1) -> Optional[ScriptLocation]:
+        """
+        Faz o *parse* do texto gerado por traceback.format_exc() e extrai arquivo/linha/função.
+        - frame_index: -1 pega o último frame (onde a exceção estourou).
+        Formato esperado das linhas:
+            File "/caminho/mod.py", line 123, in func
+        """
+        from traceback import format_exc
+
+        # Captura tuplas (arquivo, linha, função)
+        # Obs.: tolera espaços e caminhos com aspas; não captura a linha de código em si.
+        pattern = r'(?i:File) "(.+?)", (?i:line) (\d+), (?i:in) ([^\n\r]+)'
+        matches = re.findall(pattern, format_exc())
+
+        if not matches:
+            return None
+
+        file_path, lineno, func = matches[stack_index]
+        return ScriptLocation(
+            file_name=Path(file_path).name,
+            function_name=func.strip(),
+            line=str(lineno),
         )
 
     @staticmethod
@@ -167,3 +194,16 @@ class Logger(object):
                               f"{Color.color_reset} {fg_color}{line}{Color.color_reset}")
 
         Logger.pl(f_message)
+
+    @classmethod
+    def print_exception(cls, err):
+        from traceback import format_exc
+        err_txt = 'Error:{O} %s{W}' % str(err)
+        err_txt += '\n{O}Full stack trace below\n'
+        err_txt += format_exc().strip()
+
+        err_txt = err_txt.replace('\n', '\n{W}   ')
+        err_txt = err_txt.replace('  File', '{W}{D}File')
+        err_txt = err_txt.replace('  Exception: ', '{R}Exception: {O}')
+
+        Logger.pl(f"{err_txt}\n")

@@ -4,6 +4,7 @@ import math
 import shutil
 import os.path
 import sqlite3
+import time
 from functools import reduce
 from pathlib import Path
 from sqlite3 import Connection, ProgrammingError
@@ -78,7 +79,7 @@ class Database(object):
         (columns, values) = self.parse_args(kwargs)
         sql = "INSERT INTO {} ({}) VALUES ({})" \
             .format(table_name, ','.join(columns), ', '.join(['?'] * len(columns)))
-        conn.execute(sql, values)
+        self.resilient_execute(conn, sql, values)
         conn.commit()
 
     @connect
@@ -89,7 +90,7 @@ class Database(object):
             (columns, values) = self.parse_args(kwargs)
             sql = "INSERT INTO {} ({}) VALUES ({})" \
                 .format(table_name, ','.join(columns), ', '.join(['?'] * len(columns)))
-            conn.execute(sql, values)
+            self.resilient_execute(conn, sql, values)
             conn.commit()
 
     @connect
@@ -98,7 +99,7 @@ class Database(object):
         (columns, values) = self.parse_args(kwargs)
         sql = "INSERT OR IGNORE INTO {} ({}) VALUES ({})" \
             .format(table_name, ','.join(columns), ', '.join(['?'] * len(columns)))
-        conn.execute(sql, values)
+        self.resilient_execute(conn, sql, values)
         conn.commit()
 
     @connect
@@ -107,7 +108,7 @@ class Database(object):
         (columns, values) = self.parse_args(kwargs)
         sql = "INSERT OR REPLACE INTO {} ({}) VALUES ({})" \
             .format(table_name, ','.join(columns), ', '.join(['?'] * len(columns)))
-        conn.execute(sql, values)
+        self.resilient_execute(conn, sql, values)
         conn.commit()
 
     def insert_update_one(self, table_name: str, **kwargs):
@@ -119,7 +120,7 @@ class Database(object):
         (columns, values) = self.parse_args(kwargs)
         sql = "INSERT OR IGNORE INTO {} ({}) VALUES ({})" \
             .format(table_name, ','.join(columns), ', '.join(['?'] * len(columns)))
-        c = conn.execute(sql, values)
+        c = self.resilient_execute(conn, sql, values)
 
         status = {'inserted': c.rowcount, 'updated': 0}
 
@@ -135,7 +136,7 @@ class Database(object):
             sql += "{}".format(', '.join([f'{col} = ?' for col in u_columns]))
             if len(f_columns) > 0:
                 sql += " WHERE {}".format(f' and '.join([f'{col} = ?' for col in f_columns]))
-            c = conn.execute(sql, tuple(u_values + f_values, ))
+            c = self.resilient_execute(conn, sql, tuple(u_values + f_values, ))
             conn.commit()
 
             status['updated'] = c.rowcount
@@ -155,12 +156,16 @@ class Database(object):
         if len(columns) > 0:
             sql += " WHERE {}".format(f' {operator} '.join([f'{col} = ?' for col in columns]))
 
-        cursor = conn.execute(sql, values)
-        if cursor.rowcount == 0:
-            return []
+        data = []
+        with conn:  # Transaction
+            cursor = self.resilient_execute(conn, sql, values)
+            if cursor.rowcount == 0:
+                return data
 
-        columns = cursor.description
-        return [{columns[index][0]: column for index, column in enumerate(value)} for value in cursor.fetchall()]
+            columns = cursor.description
+            data = [{columns[index][0]: column for index, column in enumerate(value)} for value in cursor.fetchall()]
+
+        return data
 
     def select_first(self, table_name, **kwargs):
         data = self.select(table_name, **kwargs)
@@ -170,11 +175,15 @@ class Database(object):
 
     @connect
     def select_raw(self, conn: Connection, sql: str, args: any):
-        cursor = conn.execute(sql, tuple(args,))
+        cursor = self.resilient_execute(conn, sql, tuple(args,))
         if cursor.rowcount == 0:
             return []
         columns = cursor.description
-        return [{columns[index][0]: column for index, column in enumerate(value)} for value in cursor.fetchall()]
+        data = []
+        with conn:  # Transaction
+            data = [{columns[index][0]: column for index, column in enumerate(value)} for value in cursor.fetchall()]
+
+        return data
 
     @connect
     def select_count(self, conn: Connection, table_name, **kwargs) -> int:
@@ -187,10 +196,13 @@ class Database(object):
         sql = f"SELECT count(*) FROM {table_name}"
         if len(columns) > 0:
             sql += " WHERE {}".format(f' {operator} '.join([f'{col} = ?' for col in columns]))
-        cursor = conn.execute(sql, values)
-        if cursor.rowcount == 0:
-            return 0
-        data = cursor.fetchone()
+
+        data = []
+        with conn:  # Transaction
+            cursor = self.resilient_execute(conn, sql, values)
+            if cursor.rowcount == 0:
+                return 0
+            data = cursor.fetchone()
 
         return int(data[0])
 
@@ -205,7 +217,7 @@ class Database(object):
         sql = f"DELETE FROM {table_name}"
         if len(columns) > 0:
             sql += " WHERE {}".format(f' {operator} '.join([f'{col} = ?' for col in columns]))
-        conn.execute(sql, values)
+        self.resilient_execute(conn, sql, values)
         conn.commit()
 
     @connect
@@ -221,7 +233,7 @@ class Database(object):
         sql += "{}".format(', '.join([f'{col} = ?' for col in u_columns]))
         if len(f_columns) > 0:
             sql += " WHERE {}".format(f' {operator} '.join([f'{col} = ?' for col in f_columns]))
-        conn.execute(sql, tuple(u_values + f_values, ))
+        self.resilient_execute(conn, sql, tuple(u_values + f_values, ))
         conn.commit()
 
     def get_constraints(self, conn: Connection) -> dict:
@@ -238,7 +250,7 @@ class Database(object):
                '  il.origin = "u"  '
                'ORDER BY table_name, key_name, ii.seqno')
 
-        cursor = conn.execute(sql)
+        cursor = self.resilient_execute(conn, sql)
         columns = cursor.description
         db_scheme = [{columns[index][0]: column for index, column in enumerate(value)} for value in cursor.fetchall()]
 
@@ -333,7 +345,7 @@ class Database(object):
 
         conn.commit()
 
-        #Must get the constraints
+        # Must get the constraints
         self.get_constraints(conn)
 
     def insert_history(self, source: str, data: str, stack_trace: str = ''):
@@ -363,3 +375,15 @@ class Database(object):
         str
         """
         return ''.join(k for k in input_string if k.isalnum() or k in '_-')
+
+    @classmethod
+    def resilient_execute(cls, conn: Connection, *args, **kwargs):
+        for _ in range(5):
+            try:
+                return conn.execute(*args, **kwargs)
+            except sqlite3.OperationalError as e:
+                if 'database is locked' in str(e).lower():
+                    time.sleep(0.3)
+                else:
+                    raise e
+
