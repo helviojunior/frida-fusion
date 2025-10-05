@@ -127,6 +127,22 @@ class Logger(object):
             return f"[ERROR] Type %s not serializable{type(obj)}"
 
     @classmethod
+    def check_print(cls, level: str = "*"):
+
+        if level is None:
+            level = "*"
+
+        dbg_tag = next(iter([
+            k
+            for k in Logger.level_map.keys()
+            if level.upper() == k
+        ]), Logger.level_tag.get(level, "I"))
+
+        dbg_idx = Logger.level_map.get(dbg_tag, 0)
+
+        return Logger.debug_level <= dbg_idx
+
+    @classmethod
     def print_message(cls, level: str = "*", message: str = "",
                       script_location: ScriptLocation = None, filename_col_len: int = 26):
 

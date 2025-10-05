@@ -50,6 +50,8 @@ class AndroidLog(ModuleBase):
                 pass
 
             # raw_args = received_data.get('rawargs', '')
+            if Logger.check_print(level="D"):
+                message += f"\n{stack_trace}"
 
             if not self._suppress_messages:
                 Logger.print_message(
@@ -57,7 +59,7 @@ class AndroidLog(ModuleBase):
                     message=f"{message}",
                     script_location=ScriptLocation(
                         file_name=tag,
-                        line=f"{script_location.file_name}:{script_location.line}",
+                        line=f"{script_location.file_name}",
                         function_name=script_location.function_name
                     ) if tag is not None else script_location
                 )
