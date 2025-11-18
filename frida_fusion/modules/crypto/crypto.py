@@ -1,5 +1,6 @@
 import json
 import os.path
+import hashlib
 from pathlib import Path
 import base64
 import string
@@ -42,6 +43,7 @@ class Crypto(ModuleBase):
                     clear_text TEXT NULL,
                     clear_text_b64 TEXT NULL,
                     cipher_data TEXT NULL,
+                    cipher_data_hash TEXT NULL,
                     status TEXT NULL DEFAULT ('open'),
                     stack_trace TEXT NULL,
                     created_date datetime not null DEFAULT (datetime('now','localtime'))
@@ -98,6 +100,38 @@ class Crypto(ModuleBase):
             except Exception as e:
                 # Color.pl('{!} {R}Erro getPrintable:{O} %s{W}' % str(e))
                 return ''
+
+        @classmethod
+        def generate_md5_hash(cls, data):
+            """
+            Generates the MD5 hash of a given string.
+
+            Args:
+                data (str): The string to be hashed.
+
+            Returns:
+                str: The 32-character hexadecimal MD5 hash of the input string.
+            """
+            # Create an MD5 hash object
+            md5_hash_object = hashlib.md5()
+
+            # Update the hash object with the bytes of the input string
+            # It's crucial to encode the string to bytes, commonly using UTF-8
+            if isinstance(data, str):
+                data = data.strip().encode('utf-8')
+
+            # Try to decode base64
+            try:
+                data = base64.b64decode(data)
+            except Exception:
+                pass
+
+            md5_hash_object.update(data)
+
+            # Get the hexadecimal representation of the hash
+            md5_hex_digest = md5_hash_object.hexdigest()
+
+            return md5_hex_digest
 
         def update_crypto(self, iv=None, hashcode=None, flow=None, key=None, before_final=None,
                           after_final=None, stack_trace=None, id=None, algorithm=None,
@@ -179,15 +213,16 @@ class Crypto(ModuleBase):
                         update += " clear_text = ?, clear_text_b64 = ?,"
                         data.append(self.get_printable(before_final))
                     else:
-                        update += " cipher_data = ?,"
+                        update += " cipher_data_hash = ?, cipher_data = ?,"
+                        data.append(self.generate_md5_hash(before_final))
 
                     data.append(before_final)
 
                 if after_final is not None:
                     integrity = True
                     if dbflow == "enc":
-                        update += " cipher_data = ?, status = 'complete'"
-
+                        update += " cipher_data_hash = ?, cipher_data = ?, status = 'complete'"
+                        data.append(self.generate_md5_hash(after_final))
                     else:
                         update += " clear_text = ?, clear_text_b64 = ?, status = 'complete'"
                         data.append(self.get_printable(after_final))
