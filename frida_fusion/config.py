@@ -6,6 +6,7 @@ import sys
 import signal
 from argparse import Namespace
 from pathlib import Path
+from importlib.metadata import version, PackageNotFoundError
 
 from .module import Module, ModuleManager, InternalModule, ExternalModule, LocalModule
 from .libs.color import Color
@@ -186,7 +187,19 @@ class Configuration(object):
         Configuration.debug_level = Logger.level_map.get(str(args.debug_level).upper(), 0)
         Logger.debug_level = Configuration.debug_level
 
-        Logger.pl('     {C}min debug level:{O} %s{W}' % str(args.debug_level).upper())
+        frida_version = ""
+        frida_tools_version = ""
+        try:
+            frida_version = version("frida")
+        except PackageNotFoundError:
+            frida_version = "Package not installed"
+        try:
+            frida_tools_version = version("frida-tools")
+        except PackageNotFoundError:
+            frida_tools_version = "Package not installed"
+
+        Logger.pl('     {C}frida version:{O} %s{W}' % frida_version)
+        Logger.pl('     {C}frida-tools version:{O} %s{W}' % frida_tools_version)
 
         mods = ModuleManager.list_modules(local_path=Path(Configuration.frida_scripts))
         if (args.enabled_modules is not None and isinstance(args.enabled_modules, list)) or \
