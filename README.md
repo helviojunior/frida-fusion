@@ -43,7 +43,7 @@ Modules:
 sudo apt install pipx
 
 pipx install frida-fusion 
-pipx inject frida==15.1.17 frida-tools==10.8.0
+pipx inject frida-fusion frida==15.1.17 frida-tools==10.8.0
 ```
 
 > Note: If you face the error `unable to communicate with remote frida-server; please ensure that major versions match and that the remote Frida has the feature you are trying to use` try to adjust the frida version
