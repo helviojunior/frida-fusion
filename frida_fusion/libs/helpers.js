@@ -73,6 +73,12 @@ function fusion_Send(payload1, payload2){
         message.type = payload1.type;
     }
 
+    // If payload1 is a string
+    var nativeStr = fusion_toStringPrimitive(payload1);
+    if (nativeStr !== null) {
+        message.stack_trace = fusion_getB64StackTrace();
+    }
+
     send(message, payload2);
 }
 
@@ -125,6 +131,39 @@ function fusion_toLongPrimitive(v, fallback /* opcional */) {
   } catch (_) {}
 
   return FB;
+}
+
+function fusion_toStringPrimitive(v) {
+  try {
+    if (v === null || v === undefined) {
+      return null;
+    }
+
+    // Já é string JS primitiva
+    if (typeof v === 'string') {
+      return v;
+    }
+
+    // java.lang.String
+    try {
+      const JString = Java.use('java.lang.String');
+      if (JString && JString.$isInstance(v)) {
+        return String(v); // converte para string JS primitiva
+      }
+    } catch (_) {}
+
+    // Qualquer objeto com toString()
+    if (v.toString && typeof v.toString === 'function') {
+      const s = v.toString();
+
+      // Garante retorno primitivo e evita "[object Object]"
+      if (typeof s === 'string' && s !== '[object Object]') {
+        return s;
+      }
+    }
+  } catch (_) {}
+
+  return null;
 }
 
 function fusion_toBytes(message){
@@ -294,12 +333,14 @@ function fusion_sendMessage(level, message){
         const Base64Class = Java.use('android.util.Base64');
         var bTxt = StringClass.$new(message).getBytes('utf-8');
         var b64Msg = Base64Class.encodeToString(bTxt, 0x00000002); //Base64Class.NO_WRAP = 0x00000002
+        var st = fusion_getB64StackTrace();
 
         //send('{"type" : "message", "level" : "'+ level +'", "message" : "'+ b64Msg +'"}');
         fusion_Send({
           type: "message",
           level: level,
-          message: b64Msg
+          message: b64Msg,
+          stack_trace: st
         }, null)
     } catch (err) {
         fusion_sendMessage("W", `Error: ${err}`)

@@ -295,6 +295,11 @@ class Fusion(object):
                 try:
                     script_location = ScriptLocation()
                     jData = message.get("payload", {})
+                    stack_trace = jData.get('stack_trace', '')
+                    try:
+                        stack_trace = base64.b64decode(stack_trace).decode("UTF-8")
+                    except:
+                        pass
                     if isinstance(jData, str):
                         jData = json.loads(message["payload"])
 
@@ -302,20 +307,26 @@ class Fusion(object):
                     p1 = jData.get("payload", None)
                     if p1 is not None:
                         location = jData.get("location", None)
+                        stack_trace = jData.get('stack_trace', '')
+                        try:
+                            stack_trace = base64.b64decode(stack_trace).decode("UTF-8")
+                        except:
+                            pass
                         jData = jData.get("payload", {})
                         script_location = self.translate_location(location)
 
                     if isinstance(jData, str):
                         msg = jData
                         try:
-                            msg = base64.b64encode(jData.encode("UTF-8"))
+                            msg = base64.b64encode(msg.encode("UTF-8"))
                         except Exception:
                             pass
 
                         jData = {
                             "type": "message",
                             "level": "I",
-                            "message": msg
+                            "message": msg,
+                            "stack_trace": stack_trace
                         }
 
                     if script_location.file_name == "<unknown>":
@@ -333,6 +344,16 @@ class Fusion(object):
                             msg = base64.b64decode(msg).decode("UTF-8")
                         except:
                             pass
+
+                        if Logger.debug_level == 0:
+
+                            stack_trace = jData.get('stack_trace', '')
+                            try:
+                                stack_trace = base64.b64decode(stack_trace).decode("UTF-8")
+                            except:
+                                pass
+
+                            msg = f"{msg}\n{stack_trace}"
 
                         self.print_message_inst(mLevel, msg, script_location=script_location)
 
