@@ -187,16 +187,19 @@ class Configuration(object):
         Configuration.debug_level = Logger.level_map.get(str(args.debug_level).upper(), 0)
         Logger.debug_level = Configuration.debug_level
 
-        frida_version = ""
-        frida_tools_version = ""
         try:
             frida_version = version("frida")
         except PackageNotFoundError:
-            frida_version = "Package not installed"
+            Color.pl(
+                '{!} {R}error: python package {O}frida{R} not found{W}\r\n')
+            sys.exit(1)
+
         try:
             frida_tools_version = version("frida-tools")
         except PackageNotFoundError:
-            frida_tools_version = "Package not installed"
+            Color.pl(
+                '{!} {R}error: python package {O}frida-tools{R} not found{W}\r\n')
+            sys.exit(1)
 
         Logger.pl('     {C}frida version:{O} %s{W}' % frida_version)
         Logger.pl('     {C}frida-tools version:{O} %s{W}' % frida_tools_version)
