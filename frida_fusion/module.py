@@ -5,13 +5,18 @@ from argparse import _ArgumentGroup, Namespace
 
 import inspect
 from typing import Optional
+from pathlib import Path
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    message="urllib3 v2 only supports OpenSSL"
+)  # noqa: E501,W605
 
 import frida
 import pkgutil
 import importlib
 import requests
 import importlib.util
-from pathlib import Path
 
 from .__meta__ import __version__
 from .libs.logger import Logger
