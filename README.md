@@ -147,9 +147,9 @@ frida-fusion -f [app_id] -U --script-path mytest.js -m [module_name]
 You can also use one of community developed modules
 
 ```bash
-cd /tmp/
+cd /opt/
 git clone https://github.com/helviojunior/frida-fusion-community-modules
-export FUSION_MODULES=/tmp/frida-fusion-community-modules
+export FUSION_MODULES=/opt/frida-fusion-community-modules
 
 # List all modules
 frida-fusion --list-modules
