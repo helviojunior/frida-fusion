@@ -353,7 +353,8 @@ class Fusion(object):
                             except:
                                 pass
 
-                            msg = f"{msg}\n{stack_trace}"
+                            if stack_trace is not None and stack_trace.strip(" \r\n") != "":
+                                msg = f"{msg}\n{stack_trace}"
 
                         self.print_message_inst(mLevel, msg, script_location=script_location)
 
