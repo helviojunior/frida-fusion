@@ -395,6 +395,14 @@ function fusion_getB64StackTrace(){
         const Base64Class = Java.use('android.util.Base64');
         var trace = Java.use("android.util.Log").getStackTraceString(Java.use("java.lang.Exception").$new());
         trace = trace.replace("java.lang.Exception\n", "Stack trace:\n");
+        try{
+            var check = trace.replace("java.lang.Exception\n", "");
+            check = check.replace("Stack trace:\n", "");
+            check = check.replace("\n", "");
+            if (check == "") {
+                return '';
+            }
+        } catch (err1) { }
         var bTrace = StringClass.$new(trace).getBytes('utf-8');
         var b64Msg = Base64Class.encodeToString(bTrace, 0x00000002); //Base64Class.NO_WRAP = 0x00000002
 
