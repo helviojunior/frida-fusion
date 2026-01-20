@@ -650,11 +650,39 @@ class Fusion(object):
             return "  " + "   ".join(
                 f"{CYAN}{k.rjust(3)}{RESET}: {MAGENTA}{ctx.get(k, '').ljust(18)}{RESET}" for k in keys)
 
+        arch = "ARM64"
+        if any([
+            True
+            for k in ctx.keys()
+            if k.lower() in ['rax', 'rbx', 'rcx', 'rdx', 'rsp', 'rbp', 'rip', 'r8', 'r9', 'r10', 'r11', 'r12']
+        ]):
+            arch = "AMD64"
+        elif any([
+            True
+            for k in ctx.keys()
+            if k.lower() in ['eax', 'ebx', 'ecx', 'edx', 'esp', 'ebp', 'eip']
+        ]):
+            arch = "x86"
+
+        last_line = 4
         regs_order = [
             'pc', 'lr', 'sp', 'fp',
             'x0', 'x1', 'x2', 'x3', 'x4', 'x5', 'x6', 'x7', 'x8', 'x9', 'x10', 'x11', 'x12', 'x13', 'x14', 'x15',
             'x16', 'x17', 'x18', 'x19', 'x20', 'x21', 'x22', 'x23', 'x24', 'x25', 'x26', 'x27', 'x28'
         ]
+        if arch == "AMD64":
+            last_line = 2
+            regs_order = [
+                'rsp', 'rip',
+                'rax', 'rbx', 'rcx', 'rdx', 'rsi', 'rdi',
+                'r8', 'r9', 'r10', 'r11', 'r12', 'r13', 'r14', 'r15'
+            ]
+        elif arch == "x86":
+            last_line = 2
+            regs_order = [
+                'esp', 'eip',
+                'eax', 'ebx', 'ecx', 'edx', 'esi', 'edi'
+            ]
 
         lines = [""]
         lines.append(f"{BOLD}{RED}===== Native Exception ====={RESET}")
@@ -667,10 +695,10 @@ class Fusion(object):
             lines.append(f"  {CYAN}operation{RESET}: {mem.get('operation', '')}")
             lines.append(f"  {CYAN}address{RESET}:   {MAGENTA}{mem.get('address', '')}{RESET}\n")
 
-        lines.append(f"{BOLD}Context (ARM64):{RESET}")
+        lines.append(f"{BOLD}Context ({arch}):{RESET}")
 
         group = []
-        for r in regs_order[4:]:
+        for r in regs_order[last_line:]:
             group.append(r)
             if len(group) == 4:
                 lines.append(reg_line(group))
@@ -678,7 +706,7 @@ class Fusion(object):
         if group:
             lines.append(reg_line(group))
 
-        lines.append(reg_line(['lr', 'sp', 'pc', 'fp']))
+        lines.append(reg_line(regs_order[0:last_line]))
 
         lines.append(f"\n{YELLOW}nativeContext:{RESET} {MAGENTA}{ncx}{RESET}")
 
