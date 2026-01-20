@@ -136,7 +136,7 @@ class Fusion(object):
         for m in self._modules:
             files_js += m.js_files()
             dyn = m.dynamic_script()
-            if dyn is not None and dyn.strip(" \r\n") != "":
+            if dyn is not None and dyn.rstrip(" \r\n") != "":
                 dyn += "\n\n"
                 line_cnt = len(dyn.split("\n")) - 1
                 self.script_trace[f"dyn_{m.safe_name()}.js"] = (offset, offset + line_cnt)
