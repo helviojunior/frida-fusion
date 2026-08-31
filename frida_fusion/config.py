@@ -43,6 +43,8 @@ class Configuration(object):
     out_file = None
     print_timestamp = False
     use_delay = False
+    delay_time = 0.2
+    follow_children = False
 
     @staticmethod
     def initialize():
@@ -172,8 +174,14 @@ class Configuration(object):
 
         Logger.pl('     {C}scripts path:{O} %s{W}' % Configuration.frida_scripts)
 
-        if args.delay:
+        if args.delay is not None and float(args.delay) > 0:
             Configuration.use_delay = True
+            Configuration.delay_time = float(args.delay)
+            Logger.pl('     {C}delay injection:{O} %.1f second(s){W}' % Configuration.delay_time)
+
+        if args.follow_children:
+            Configuration.follow_children = True
+            Logger.pl('     {C}follow children:{O} enabled{W}')
 
         if args.show_time:
             Configuration.print_timestamp = True

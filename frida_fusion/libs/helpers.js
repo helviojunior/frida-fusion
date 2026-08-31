@@ -56,6 +56,79 @@ function fusion_isReactNativeApp(reactClasses) {
     return false;
 }
 
+/* Indica se o processo alvo possui VM Java (Android/JVM).
+ * Em processos nativos (Windows/Linux/macOS) Java.use lança
+ * "Java API not available", por isso nada do caminho de log pode depender dela. */
+function fusion_hasJava() {
+    try {
+        return (typeof Java !== 'undefined') && Java.available === true;
+    } catch (e) {
+        return false;
+    }
+}
+
+const FUSION_B64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+/* Converte uma string JS em bytes UTF-8 (trata pares substitutos). */
+function fusion_utf8Bytes(str) {
+    var bytes = [];
+    for (var i = 0; i < str.length; i++) {
+        var c = str.charCodeAt(i);
+        if (c >= 0xD800 && c <= 0xDBFF && i + 1 < str.length) {
+            var c2 = str.charCodeAt(i + 1);
+            if (c2 >= 0xDC00 && c2 <= 0xDFFF) {
+                c = 0x10000 + ((c - 0xD800) << 10) + (c2 - 0xDC00);
+                i++;
+            }
+        }
+        if (c < 0x80) {
+            bytes.push(c);
+        } else if (c < 0x800) {
+            bytes.push(0xC0 | (c >> 6), 0x80 | (c & 0x3F));
+        } else if (c < 0x10000) {
+            bytes.push(0xE0 | (c >> 12), 0x80 | ((c >> 6) & 0x3F), 0x80 | (c & 0x3F));
+        } else {
+            bytes.push(0xF0 | (c >> 18), 0x80 | ((c >> 12) & 0x3F),
+                       0x80 | ((c >> 6) & 0x3F), 0x80 | (c & 0x3F));
+        }
+    }
+    return bytes;
+}
+
+/* Base64 em JS puro, equivalente a android.util.Base64.NO_WRAP.
+ * Não depende de VM Java, portanto funciona em qualquer processo. */
+function fusion_b64Encode(str) {
+    var bytes = fusion_utf8Bytes(String(str));
+    var out = "";
+    for (var i = 0; i < bytes.length; i += 3) {
+        var b0 = bytes[i];
+        var b1 = bytes[i + 1];
+        var b2 = bytes[i + 2];
+        out += FUSION_B64_ALPHABET[b0 >> 2];
+        out += FUSION_B64_ALPHABET[((b0 & 0x03) << 4) | (b1 === undefined ? 0 : b1 >> 4)];
+        out += (b1 === undefined) ? "="
+             : FUSION_B64_ALPHABET[((b1 & 0x0F) << 2) | (b2 === undefined ? 0 : b2 >> 6)];
+        out += (b2 === undefined) ? "=" : FUSION_B64_ALPHABET[b2 & 0x3F];
+    }
+    return out;
+}
+
+/* Último recurso: envia um aviso sem passar por fusion_sendMessage.
+ * Evita a recursão infinita que engolia todas as mensagens quando o
+ * encoder falhava (era o caso em todo processo sem VM Java). */
+function fusion_sendFallbackWarning(text) {
+    try {
+        send({
+            payload: {
+                type: "message",
+                level: "W",
+                message: fusion_b64Encode(String(text)),
+                stack_trace: ""
+            }
+        });
+    } catch (_) { }
+}
+
 function fusion_rawSend(payload1){
     send(payload1);
 }
@@ -97,6 +170,7 @@ function fusion_waitForClass(name, onReady) {
 }
 
 function fusion_printStackTrace(){
+    if (!fusion_hasJava()) return;
     var trace = Java.use("android.util.Log").getStackTraceString(Java.use("java.lang.Exception").$new());
     trace = trace.replace("java.lang.Exception\n", "Stack trace:\n");
     fusion_sendMessage("I", trace);
@@ -299,7 +373,7 @@ function fusion_getCallerInfo() {
       }
     }
   } catch (err) {
-    console.log(`Error: ${err}`)
+    fusion_sendFallbackWarning(`Error: ${err}`)
   }
   return null;
 }
@@ -329,13 +403,9 @@ function fusion_sendKeyValueData(module, items) {
 
 function fusion_sendMessage(level, message){
     try{
-        const StringClass = Java.use('java.lang.String');
-        const Base64Class = Java.use('android.util.Base64');
-        var bTxt = StringClass.$new(message).getBytes('utf-8');
-        var b64Msg = Base64Class.encodeToString(bTxt, 0x00000002); //Base64Class.NO_WRAP = 0x00000002
+        var b64Msg = fusion_b64Encode(message);
         var st = fusion_getB64StackTrace();
 
-        //send('{"type" : "message", "level" : "'+ level +'", "message" : "'+ b64Msg +'"}');
         fusion_Send({
           type: "message",
           level: level,
@@ -343,31 +413,29 @@ function fusion_sendMessage(level, message){
           stack_trace: st
         }, null)
     } catch (err) {
-        fusion_sendMessage("W", `Error: ${err}`)
+        // Nunca chamar fusion_sendMessage aqui: recursão infinita descarta a mensagem.
+        fusion_sendFallbackWarning(`Error: ${err}`)
     }
 }
 
 function fusion_sendMessageWithTrace(level, message){
     try{
-        const StringClass = Java.use('java.lang.String');
-        const Base64Class = Java.use('android.util.Base64');
+        if (fusion_hasJava()) {
+            var trace = Java.use("android.util.Log").getStackTraceString(Java.use("java.lang.Exception").$new());
+            trace = trace.replace("java.lang.Exception\n", "Stack trace:\n");
+            message += "\n"
+            message += trace
+        }
 
-        var trace = Java.use("android.util.Log").getStackTraceString(Java.use("java.lang.Exception").$new());
-        trace = trace.replace("java.lang.Exception\n", "Stack trace:\n");
-        message += "\n"
-        message += trace
+        var b64Msg = fusion_b64Encode(message);
 
-        var bTxt = StringClass.$new(message).getBytes('utf-8');
-        var b64Msg = Base64Class.encodeToString(bTxt, 0x00000002); //Base64Class.NO_WRAP = 0x00000002
-
-        //send('{"type" : "message", "level" : "'+ level +'", "message" : "'+ b64Msg +'"}');
         fusion_Send({
           type: "message",
           level: level,
           message: b64Msg
         }, null)
     } catch (err) {
-        fusion_sendMessage("W", `Error: ${err}`)
+        fusion_sendFallbackWarning(`Error: ${err}`)
     }
 }
 
@@ -390,9 +458,10 @@ function fusion_encodeHex(byteArray) {
 
 function fusion_getB64StackTrace(){
 
+    // Processos nativos não possuem stack trace Java para reportar.
+    if (!fusion_hasJava()) return '';
+
     try{
-        const StringClass = Java.use('java.lang.String');
-        const Base64Class = Java.use('android.util.Base64');
         var trace = Java.use("android.util.Log").getStackTraceString(Java.use("java.lang.Exception").$new());
         trace = trace.replace("java.lang.Exception\n", "Stack trace:\n");
         try{
@@ -403,13 +472,10 @@ function fusion_getB64StackTrace(){
                 return '';
             }
         } catch (err1) { }
-        var bTrace = StringClass.$new(trace).getBytes('utf-8');
-        var b64Msg = Base64Class.encodeToString(bTrace, 0x00000002); //Base64Class.NO_WRAP = 0x00000002
-
-        return b64Msg
+        return fusion_b64Encode(trace);
 
     } catch (err) {
-        fusion_sendMessage("W", `Error: ${err}`)
+        fusion_sendFallbackWarning(`Error: ${err}`)
         return '';
     }
 }
@@ -513,32 +579,37 @@ function fusion_describeAddress(p) {
 }
 
 
-Java.perform(function () {
-  const Thread = Java.use('java.lang.Thread');
-  const UEH = Java.registerClass({
-    name: 'br.com.sec4us.UehProxy',
-    implements: [Java.use('java.lang.Thread$UncaughtExceptionHandler')],
-    methods: {
-      uncaughtException: [{
-        returnType: 'void',
-        argumentTypes: ['java.lang.Thread', 'java.lang.Throwable'],
-        implementation: function (t, e) {
-          try {
-            const Throwable = Java.use('java.lang.Throwable');
-            const sw = Java.use('java.io.StringWriter').$new();
-            const pw = Java.use('java.io.PrintWriter').$new(sw);
-            Throwable.$new(e).printStackTrace(pw);
-            send({ type: 'java-uncaught', thread: t.getName(), stack: sw.toString() });
-          } catch (err) { send({ type: 'java-uncaught-error', err: err+'' }); }
-          // Opcional: impedir que o app morra? Não é garantido; normalmente o processo cai.
-        }
-      }]
-    }
-  });
+// Somente processos com VM Java (Android/JVM) possuem a Java API.
+// Em processos nativos (ex.: Windows/Linux/macOS) Java.perform lança
+// "Error: Java API not available" e aborta o carregamento do script.
+if (typeof Java !== 'undefined' && Java.available) {
+  Java.perform(function () {
+    const Thread = Java.use('java.lang.Thread');
+    const UEH = Java.registerClass({
+      name: 'br.com.sec4us.UehProxy',
+      implements: [Java.use('java.lang.Thread$UncaughtExceptionHandler')],
+      methods: {
+        uncaughtException: [{
+          returnType: 'void',
+          argumentTypes: ['java.lang.Thread', 'java.lang.Throwable'],
+          implementation: function (t, e) {
+            try {
+              const Throwable = Java.use('java.lang.Throwable');
+              const sw = Java.use('java.io.StringWriter').$new();
+              const pw = Java.use('java.io.PrintWriter').$new(sw);
+              Throwable.$new(e).printStackTrace(pw);
+              send({ type: 'java-uncaught', thread: t.getName(), stack: sw.toString() });
+            } catch (err) { send({ type: 'java-uncaught-error', err: err+'' }); }
+            // Opcional: impedir que o app morra? Não é garantido; normalmente o processo cai.
+          }
+        }]
+      }
+    });
 
-  // Define globalmente
-  Thread.setDefaultUncaughtExceptionHandler(UEH.$new());
-});
+    // Define globalmente
+    Thread.setDefaultUncaughtExceptionHandler(UEH.$new());
+  });
+}
 
 function fusion_formatBacktrace(frames) {
   return frames.map((addr, i) => {

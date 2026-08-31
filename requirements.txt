@@ -1,6 +1,6 @@
 colorama
 requests>=2.23.0
 urllib3
-frida>=15.1.17
-frida-tools>=10.8.0
+frida>=15.1.17,<16.1
+frida-tools>=10.8.0,<12.1
 cryptography>=45.0.7

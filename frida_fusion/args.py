@@ -139,10 +139,19 @@ class Arguments(object):
                           help='JS File path or directory with Frida script')
 
         glob.add_argument('--delay-injection',
-                          action='store_true',
+                          nargs='?',
                           dest='delay',
+                          metavar='seconds',
+                          type=float,
+                          const=0.2,
+                          default=0.0,
+                          help='Delay script injection (default: 0.2 seconds)')
+
+        glob.add_argument('--follow-children',
+                          action='store_true',
+                          dest='follow_children',
                           default=False,
-                          help='Delay script injection')
+                          help='Instrument child processes spawned by the target')
 
         glob.add_argument('--show-time',
                           action='store_true',

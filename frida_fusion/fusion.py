@@ -47,6 +47,9 @@ class Fusion(object):
         self.script_trace = {}
         self._modules = []
         self._ignore_messages = []
+        self._child_sessions = {}
+        self._main_detached = False
+        self._failed = False
         signal.signal(signal.SIGINT, self.signal_handler)
 
         t = threading.Thread(target=Fusion._db_worker, daemon=True)
@@ -63,6 +66,18 @@ class Fusion(object):
 
     def wait(self):
         self.done.wait()  # bloqueia até receber o set()
+
+        for pid, session in list(self._child_sessions.items()):
+            try:
+                session.detach()
+            except:
+                pass
+            try:
+                self.device.kill(pid)
+            except:
+                pass
+        self._child_sessions = {}
+
         try:
             self.session.detach()
         except:
@@ -109,12 +124,15 @@ class Fusion(object):
             if v[0] <= loc.get_int_line() <= v[1]
         ]), loc)
 
-    def load_all_scripts(self):
+    def load_all_scripts(self, session=None, quiet: bool = False):
+        session = self.session if session is None else session
+
         self.script_trace = {}
         offset = 1
         line_cnt = 0
 
-        Logger.pl("{*} Loading FridaFusion helpers script")
+        if not quiet:
+            Logger.pl("{*} Loading FridaFusion helpers script")
         src = ""
         try:
             src += self.sanitize_js(
@@ -165,9 +183,11 @@ class Fusion(object):
             file_name = Path(file_path).name
             file_data = self.sanitize_js(open(file_path, 'r', encoding='utf-8').read())
             if '#NOLOAD' in file_data:
-                Logger.pl('{!} {O}Alert:{W} {G}#NOLOAD{W} tag found at {G}%s{W}, ignoring file.{W}' % str(file_name))
+                if not quiet:
+                    Logger.pl('{!} {O}Alert:{W} {G}#NOLOAD{W} tag found at {G}%s{W}, ignoring file.{W}' % str(file_name))
             else:
-                Logger.pl("{*} Loading script file " + file_name)
+                if not quiet:
+                    Logger.pl("{*} Loading script file " + file_name)
                 for r in ["*", "-", "+", "!"]:
                     file_data = file_data.replace(f"console.log('[{r}] ", f"fusion_sendMessage('{r}', '")
                     file_data = file_data.replace(f'console.log("[{r}] ', f'fusion_sendMessage("{r}", "')
@@ -192,9 +212,13 @@ class Fusion(object):
             Logger.filename_col_len = Fusion.max_filename
 
         try:
-            s = self.session.create_script(src, name="fusion_bundle")
+            s = session.create_script(src, name="fusion_bundle")
             s.on("message", self.make_handler("fusion_bundle.js"))  # register the message handler
             s.load()
+        except (frida.TransportError, frida.InvalidOperationError,
+                frida.ProcessNotFoundError, frida.ProcessNotRespondingError) as err:
+            self.injection_failed(err)
+            return
         except Exception as err:
             try:
                 from traceback import format_exc
@@ -228,6 +252,76 @@ class Fusion(object):
                 print("")
                 sys.exit(1)
 
+    def injection_failed(self, err):
+        ''' The target went away before the scripts could be injected. '''
+        Logger.pl('\n{!} {R}Could not inject the scripts:{O} %s{W}' % str(err))
+        Logger.pl('{!} {O}The target process is gone before the injection has finished.{W}')
+
+        if Configuration.use_delay:
+            Logger.pl(('{*} {C}The injection was delayed by {O}%.1f{C} second(s); a shorter delay or no '
+                       '{O}--delay-injection{C} at all keeps the process suspended until the scripts are loaded.{W}')
+                      % Configuration.delay_time)
+
+        if not Configuration.follow_children:
+            Logger.pl(('{*} {C}Launchers/stubs (Electron, Squirrel, installers) start the real application in a '
+                       'child process and exit. Use {O}--follow-children{C} to instrument those, or attach to the '
+                       'already running process with {O}--attach-pid{C}.{W}'))
+
+        Fusion.running = False
+        self._failed = True
+        self.done.set()
+
+    def process_alive(self, pid: int) -> bool:
+        try:
+            return any(p.pid == pid for p in self.device.enumerate_processes())
+        except Exception:
+            return False
+
+    def enable_child_gating(self):
+        if not Configuration.follow_children:
+            return
+
+        try:
+            self.device.enable_child_gating()
+        except Exception as err:
+            Logger.pl('{!} {O}Could not enable child gating:{W} %s' % str(err))
+            return
+
+        self.device.on("child-added", self.on_child_added)
+
+    def on_child_added(self, child):
+        pid = child.pid
+        name = child.path if child.path is not None else child.identifier
+
+        try:
+            Logger.pl('{+} {C}Child process spawned {O}%s{C} (pid {O}%s{C}), instrumenting it{W}'
+                      % (str(name), str(pid)))
+
+            session = self.device.attach(pid)
+            session.on("detached", self.make_child_detached_handler(pid))
+            self._child_sessions[pid] = session
+
+            self.load_all_scripts(session=session, quiet=True)
+        except Exception as err:
+            self._child_sessions.pop(pid, None)
+            Logger.pl('{!} {O}Could not instrument child pid %s:{W} %s' % (str(pid), str(err)))
+        finally:
+            # A gated child stays suspended until it is explicitly resumed
+            try:
+                self.device.resume(pid)
+            except Exception:
+                pass
+
+    def make_child_detached_handler(self, pid: int):
+        def handler(reason, crash):
+            self._child_sessions.pop(pid, None)
+            Logger.pl('{!} {O}Child pid %s detached:{W} reason=%s' % (str(pid), str(reason)))
+
+            if self._main_detached and len(self._child_sessions) == 0:
+                self.done.set()
+
+        return handler
+
     def attach(self, pid: int):
         Fusion.running = True
         self.pid = pid
@@ -239,12 +333,17 @@ class Fusion(object):
                 pass
             self.session = None
 
+        self.enable_child_gating()
+
         self.session = self.device.attach(self.pid)
         self.session.on("detached", self.on_detached)
 
         Logger.pl("{+} Starting frida scripts")
         self.load_all_scripts()
-        self.device.resume(self.pid)
+        try:
+            self.device.resume(self.pid)
+        except Exception:
+            pass  # the process was already running, nothing to resume
 
     def std_spawn(self):
         Fusion.running = True
@@ -256,13 +355,15 @@ class Fusion(object):
                 pass
             self.session = None
 
+        self.enable_child_gating()
+
         self.pid = self.device.spawn([Configuration.package])
         self.session = self.device.attach(self.pid)
         self.session.on("detached", self.on_detached)
 
         Logger.pl("{+} Starting frida scripts")
         self.load_all_scripts()
-        self.device.resume(self.pid)
+        self.resume(self.pid)
 
     def wait_spawn(self):
         Fusion.running = True
@@ -274,16 +375,34 @@ class Fusion(object):
                 pass
             self.session = None
 
+        self.enable_child_gating()
+
         self.pid = self.device.spawn([Configuration.package])
         self.device.resume(self.pid)
 
-        time.sleep(0.2)  # Without it Java.perform silently fails
+        # Without it Java.perform silently fails
+        delay = Configuration.delay_time if Configuration.delay_time > 0 else 2.0
+        Logger.pl('{+} {C}Waiting {O}%.1f{C} second(s) before the script injection{W}' % delay)
+        time.sleep(delay)
+
+        if not self.process_alive(self.pid):
+            self.injection_failed('process %s is no longer running' % str(self.pid))
+            return
 
         self.session = self.device.attach(self.pid)
         self.session.on("detached", self.on_detached)
 
         Logger.pl("{+} Starting frida scripts")
         self.load_all_scripts()
+
+    def resume(self, pid: int):
+        if not Fusion.running:
+            return
+
+        try:
+            self.device.resume(pid)
+        except Exception as err:
+            self.injection_failed(err)
 
     def make_handler(self, script_name):
         def handler(message, payload):
@@ -502,6 +621,14 @@ class Fusion(object):
             Logger.pl("[CRASH] details: " + str(crash))
 
         Logger.pl("")
+
+        self._main_detached = True
+
+        if Configuration.follow_children and len(self._child_sessions) > 0:
+            Logger.pl('{*} {C}Main process is gone, still instrumenting {O}%d{C} child process(es){W}'
+                      % len(self._child_sessions))
+            return
+
         self.done.set()
 
     def _replace_location(self, message: str) -> str:
@@ -818,7 +945,7 @@ class Fusion(object):
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             Logger.pl('{+} {C}End time {O}%s{W}' % timestamp)
             print(' ')
-            sys.exit(0)
+            sys.exit(1 if self._failed else 0)
 
         except Exception as e:
             Logger.pl('\n{!} {R}Error:{O} %s{W}' % str(e))
