@@ -212,9 +212,13 @@ class Fusion(object):
             Logger.filename_col_len = Fusion.max_filename
 
         try:
+            # Errors raised while the bundle is still loading are fatal (the script
+            # is broken); errors raised later come from a hook and must not stop us.
+            loading = {"done": False}
             s = session.create_script(src, name="fusion_bundle")
-            s.on("message", self.make_handler("fusion_bundle.js"))  # register the message handler
+            s.on("message", self.make_handler("fusion_bundle.js", loading))  # register the message handler
             s.load()
+            loading["done"] = True
         except (frida.TransportError, frida.InvalidOperationError,
                 frida.ProcessNotFoundError, frida.ProcessNotRespondingError) as err:
             self.injection_failed(err)
@@ -404,7 +408,7 @@ class Fusion(object):
         except Exception as err:
             self.injection_failed(err)
 
-    def make_handler(self, script_name):
+    def make_handler(self, script_name, loading: dict = None):
         def handler(message, payload):
 
             if not Fusion.running:
@@ -593,12 +597,20 @@ class Fusion(object):
                             "stack": stack
                         }))
 
-                        self.print_message_inst("F", description + stack,
-                                                script_location=script_location)
-                        Fusion.running = False
-                        time.sleep(0.2)
-                        Logger.pl('\n{+} {O}Exiting...{O}{W}')
-                        self.done.set()
+                        still_loading = loading is not None and not loading.get("done", False)
+
+                        if not Configuration.stop_on_error and not still_loading:
+                            # An uncaught exception inside a hook does not break the
+                            # session: frida itself keeps going, so report and continue.
+                            self.print_message_inst("E", description + stack,
+                                                    script_location=script_location)
+                        else:
+                            self.print_message_inst("F", description + stack,
+                                                    script_location=script_location)
+                            Fusion.running = False
+                            time.sleep(0.2)
+                            Logger.pl('\n{+} {O}Exiting...{O}{W}')
+                            self.done.set()
                     else:
                         self.print_message_inst("I", message, script_location=script_location)
                         self.print_message_inst("I", payload, script_location=script_location)

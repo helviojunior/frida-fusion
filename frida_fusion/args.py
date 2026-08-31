@@ -153,6 +153,12 @@ class Arguments(object):
                           default=False,
                           help='Instrument child processes spawned by the target')
 
+        glob.add_argument('--stop-on-error',
+                          action='store_true',
+                          dest='stop_on_error',
+                          default=False,
+                          help='Stop the instrumentation on the first uncaught script error')
+
         glob.add_argument('--show-time',
                           action='store_true',
                           dest='show_time',

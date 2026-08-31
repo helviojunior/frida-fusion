@@ -45,6 +45,7 @@ class Configuration(object):
     use_delay = False
     delay_time = 0.2
     follow_children = False
+    stop_on_error = False
 
     @staticmethod
     def initialize():
@@ -182,6 +183,10 @@ class Configuration(object):
         if args.follow_children:
             Configuration.follow_children = True
             Logger.pl('     {C}follow children:{O} enabled{W}')
+
+        if args.stop_on_error:
+            Configuration.stop_on_error = True
+            Logger.pl('     {C}stop on error:{O} enabled{W}')
 
         if args.show_time:
             Configuration.print_timestamp = True
